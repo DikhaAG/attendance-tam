@@ -8,25 +8,45 @@ const adapter = new PrismaPg({
 
 const prisma = new PrismaClient({ adapter });
 
-const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@tarunagroup.co.id";
-const EMPLOYEE_EMAIL =
-  process.env.SEED_EMPLOYEE_EMAIL ?? "admin@tarunagroup.co.id";
-const SUPERVISOR_EMAIL =
-  process.env.SEED_SUPERVISOR_EMAIL ?? "infodwiky@tarunagroup.co.id";
-const MANAGER_EMAIL =
-  process.env.SEED_MANAGER_EMAIL ?? "reza@tarunagroup.co.id";
+const getSeedValue = (envVal: string | undefined, fallback: string) =>
+  envVal && envVal.trim() !== "" ? envVal.trim() : fallback;
 
-const ADMIN_CLERK_ID =
-  process.env.SEED_ADMIN_CLERK_ID ?? "user_3J8CoeZudtngPZFNVmeCG1nnZmt";
-const EMPLOYEE_CLERK_ID =
-  process.env.SEED_EMPLOYEE_CLERK_ID ?? "user_3J8Cu3tAD8Wpy5Lv0ng9SvrtuCq";
+const ADMIN_EMAIL = getSeedValue(
+  process.env.SEED_ADMIN_EMAIL,
+  "admin@tarunagroup.co.id",
+);
+const EMPLOYEE_EMAIL = getSeedValue(
+  process.env.SEED_EMPLOYEE_EMAIL,
+  "admin@tarunagroup.co.id",
+);
+const SUPERVISOR_EMAIL = getSeedValue(
+  process.env.SEED_SUPERVISOR_EMAIL,
+  "infodwiky@tarunagroup.co.id",
+);
+const MANAGER_EMAIL = getSeedValue(
+  process.env.SEED_MANAGER_EMAIL,
+  "reza@tarunagroup.co.id",
+);
+
+const ADMIN_CLERK_ID = getSeedValue(
+  process.env.SEED_ADMIN_CLERK_ID,
+  "user_3J8CoeZudtngPZFNVmeCG1nnZmt",
+);
+const EMPLOYEE_CLERK_ID = getSeedValue(
+  process.env.SEED_EMPLOYEE_CLERK_ID,
+  "user_3J8Cu3tAD8Wpy5Lv0ng9SvrtuCq",
+);
 // Placeholder — belum ada akun Clerk sungguhan di baliknya. Buat user di
 // Clerk Dashboard dengan email yang sama lalu isi SEED_SUPERVISOR_CLERK_ID /
 // SEED_MANAGER_CLERK_ID di .env supaya akunnya benar-benar bisa login.
-const SUPERVISOR_CLERK_ID =
-  process.env.SEED_SUPERVISOR_CLERK_ID ?? "user_3JJJjTC0aHAswmaItOGNuBOBzGo";
-const MANAGER_CLERK_ID =
-  process.env.SEED_MANAGER_CLERK_ID ?? "user_3JJJgxQDWIgiG5VUEjSI8cnchUZ";
+const SUPERVISOR_CLERK_ID = getSeedValue(
+  process.env.SEED_SUPERVISOR_CLERK_ID,
+  "user_3JJJjTC0aHAswmaItOGNuBOBzGo",
+);
+const MANAGER_CLERK_ID = getSeedValue(
+  process.env.SEED_MANAGER_CLERK_ID,
+  "user_3JJJgxQDWIgiG5VUEjSI8cnchUZ",
+);
 
 const HOLIDAYS_2026: { date: string; name: string; type: HolidayType }[] = [
   { date: "2026-01-01", name: "Tahun Baru Masehi", type: HolidayType.NASIONAL },
@@ -104,7 +124,7 @@ export async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: ADMIN_EMAIL },
-    update: {},
+    update: { clerkId: ADMIN_CLERK_ID },
     create: {
       clerkId: ADMIN_CLERK_ID,
       name: "Administrator",
@@ -117,7 +137,7 @@ export async function main() {
 
   const employee = await prisma.user.upsert({
     where: { email: EMPLOYEE_EMAIL },
-    update: {},
+    update: { clerkId: EMPLOYEE_CLERK_ID },
     create: {
       clerkId: EMPLOYEE_CLERK_ID,
       name: "Karyawan Contoh",
@@ -130,7 +150,7 @@ export async function main() {
 
   const supervisor = await prisma.user.upsert({
     where: { email: SUPERVISOR_EMAIL },
-    update: {},
+    update: { clerkId: SUPERVISOR_CLERK_ID },
     create: {
       clerkId: SUPERVISOR_CLERK_ID,
       name: "Dwiky Wahyudi",
@@ -143,7 +163,7 @@ export async function main() {
 
   const manager = await prisma.user.upsert({
     where: { email: MANAGER_EMAIL },
-    update: {},
+    update: { clerkId: MANAGER_CLERK_ID },
     create: {
       clerkId: MANAGER_CLERK_ID,
       name: "Reza Maulana",
