@@ -14,6 +14,9 @@ service, action and component imports it:
 - who is a Supervisor Divisi: `isDivisionSupervisor()` (`lib/division.ts`)
 - who can hold a Jabatan: `canHavePosition()` (`lib/division.ts`)
 - how an attendance becomes a recap status: `lib/attendance.ts`
+- who can review a request: `canReviewRequest()` (`lib/approval-routing.ts`)
+- whose turn to review: `isTurnToReview()` (`lib/approval-routing.ts`)
+- who can view a request: `canViewRequest()` (`lib/approval-routing.ts`)
 
 Flag any hunk that re-derives such a condition inline, e.g.
 `role === "SUPERVISOR" && positionId` in a component.

@@ -75,6 +75,8 @@ Uji modul aturan lewat `lib/**/*.test.ts` (`npm test`); aturan yang hidup di DB
 - `lib/storage.ts` — `saveImage()` (foto absensi, gambar saja) dan `saveAttachment()`
   (lampiran izin, gambar + PDF). `MAX_SIZE` di sini harus selaras dengan
   `experimental.serverActions.bodySizeLimit` di `next.config.ts`.
+- `lib/division.ts` — struktur organisasi: `buildDivisionTree()`, `isDivisionSupervisor()`, `canHavePosition()`, `normalizePositionId()`.
+- `lib/approval-routing.ts` — aturan routing pengajuan saat review: `canReviewRequest()`, `isTurnToReview()`, `canViewRequest()`, `getApprovalScope()`.
 
 `lib/daily-recap.ts` — `buildDailyRecap()` + `countRecapStatus()`: rekap satu hari
 (satu baris per karyawan aktif), dipakai bersama `/admin/dashboard` dan `/admin/kehadiran`.
@@ -116,9 +118,9 @@ Run `npm run db:generate` after any schema change. Migrations live in `prisma/mi
 `servers/services/notification.service.ts` menghitung angka merah di sidebar
 (`NotificationService.forUser()`), dipanggil sekali di `DashboardShell` supaya
 ketiga layout tidak menghitungnya sendiri-sendiri. Isinya sengaja hanya hal yang
-perlu ditindak orang yang sedang login — setelah koreksi absensi dihapus itu
-berarti hanya antrean admin (pengajuan izin + approval absensi luar kantor);
-karyawan tidak punya antrean apa pun, jadi badge-nya kosong.
+perlu ditindak orang yang sedang login: antrean Admin (semua antrean), Supervisor
+(izin & lembur anggota divisi yang dipimpin), dan Manager (seluruh organisasi +
+divisi yatim). Karyawan tidak punya antrean review, jadi badge-nya kosong.
 
 `workDate`, `startDate`, dan `endDate` disimpan sebagai kolom `date` (tanpa jam) dan dihitung
 memakai timezone `APP_TIMEZONE` (default `Asia/Jakarta`).
