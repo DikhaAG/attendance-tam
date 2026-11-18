@@ -7,8 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 Scripts live in `package.json`. Before committing, run `npm run check`: the same
-gate CI runs (Prisma schema + migrations, lint, typecheck, Vitest). Production
-migrations: `npx prisma migrate deploy`.
+gate CI runs (Prisma schema + migrations, lint, typecheck, Vitest unit and integration
+tests). For offline or sandboxed checks without a local Postgres, run `npm run check:unit`.
+Production migrations: `npx prisma migrate deploy`.
 
 **Running the app** (dev server, seed, parity loop) needs `.env`: copy
 `.env.example`, then fill `DATABASE_URL` (local Postgres) and the Clerk dev keys
@@ -148,17 +149,13 @@ sesi Clerk-nya masih valid. Ganti password dilakukan client-side lewat
 `user.updatePassword()` (Clerk memverifikasi password lama sendiri) — tidak ada
 server action untuk itu.
 
-**Migrasi dari NextAuth (2026-09-10):** baris `User` lama diberi `clerkId` placeholder
-(`user_placeholder_<id>`) oleh migration `clerk_auth` — harus diganti manual dengan
-Clerk user id asli (buat akunnya dulu di Clerk dengan email yang sama) sebelum user
-itu bisa login.
-
 ### Components
 
 - `components/ui/` — shadcn/ui primitives (radix-ui based); do not edit these manually, use the `shadcn` CLI
 - `components/dashboard/` — shared dashboard pieces: `DataTable`, `TablePagination`, `TableSorter`, `SearchDataTable`, `DashboardSidebar`, `Navbar`, `PageHeader`
 - `components/auth/` — login form dan layout pieces
 - `components/admin/LocationMap.tsx` — peta Leaflet + OpenStreetMap (pin bisa digeser, lingkaran radius). Leaflet menyentuh `window` saat modul dimuat, jadi selalu diimpor lewat `next/dynamic` dengan `ssr: false`
+- Form pekerja: `CreateEmployeeForm` (baru) & `EditEmployeeAccountForm` (edit) di `components/admin/`, aksi di `app/action/user.action.ts`
 
 ### Providers
 

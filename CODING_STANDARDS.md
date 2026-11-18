@@ -12,6 +12,7 @@ service, action and component imports it:
 - who is late: `isLateAt()` (`lib/work-schedule.ts`)
 - the Jam Pulang / Jam Mulai Lembur for a date: `lib/work-schedule.ts`
 - who is a Supervisor Divisi: `isDivisionSupervisor()` (`lib/division.ts`)
+- who can hold a Jabatan: `canHavePosition()` (`lib/division.ts`)
 - how an attendance becomes a recap status: `lib/attendance.ts`
 
 Flag any hunk that re-derives such a condition inline, e.g.
