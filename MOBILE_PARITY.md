@@ -82,7 +82,7 @@ Next.js route it maps to.
 | `/login` | `(auth)/login.tsx` | `/login` (existing page, add `md:hidden`/`hidden md:block` split) | `app/(auth)/login/page.tsx` + `LoginForm` |
 | `/forgot-password` | `(auth)/forgot-password.tsx` | `/forgot-password` | `app/(auth)/forgot-password/page.tsx` |
 | `/reset-password` | `(auth)/reset-password.tsx` | `/reset-password` | `app/(auth)/reset-password/page.tsx` |
-| `/request-account` | `(auth)/request-account.tsx` | `/request-account` (new) | backend exists (`POST /api/account-requests`), no desktop UI — mobile-only entry point, build under `(auth)/request-account/page.tsx` |
+| `/request-account` | `(auth)/request-account.tsx` | `/request-account` → redirect `/login` | **closed** (self sign-up removed): `POST /api/account-requests` returns 410; login page has a "Hubungi admin" dialog instead |
 
 ### Authenticated tabs (`(tabs)` — bottom tab bar, role-gated)
 
@@ -221,7 +221,7 @@ existing `dashboard/app/api/*` route (thin wrappers over
 | Profile data (7 categories) | employee-data hub + 6 sub-forms | `GET /api/profile`, `PUT /api/profile/{personal-identity,contact,employment-data,work-history,documents,training}` |
 | Images (photos/docs) | Avatar, document view/download | `GET /api/images/[filename]` |
 | Holidays (referenced by date pickers disabling non-workdays — verify) | date pickers app-wide | `GET /api/holidays` |
-| Account request (pre-auth signup) | request-account | `POST /api/account-requests` (no auth) |
+| Account request (pre-auth signup) — **closed** | request-account | `POST /api/account-requests` → 410 Gone |
 
 **Not backed by a real API (port as-is, static):** Notifications screen
 list, Profile's push/reminder switches, Profile's device-sessions/
@@ -290,7 +290,7 @@ most complex (attendance capture) and the admin-adjacent approval flows.
 | 1 | Welcome | `/welcome` | static | `/welcome` | Not started | — | |
 | 2 | Login | `/login` | default, inline error, submitting | `/login` | Not started | — | |
 | 3 | Forgot/Reset password | `/forgot-password`, `/reset-password` | default, error, spinner | same paths | Not started | — | |
-| 4 | Request account | `/request-account` | form, success view, and duplicate-email error verified end-to-end (real submit against dev DB) | same path | **Built & verified** | — | New server action `requestAccount` in `account-request.action.ts` (web calls it directly instead of the mobile app's `POST /api/account-requests` fetch). Added `/request-account` to `proxy.ts`'s public-route matcher (was redirecting to `/login` otherwise). Login page's "contact your administrator" text now links here, matching mobile's "Ajukan pembuatan akun". |
+| 4 | Request account | `/request-account` | — | same path | **Removed** | — | Self sign-up closed (ticket `.scratch/divisi-sabtu-request-account/issues/07`): page redirects to `/login`, `requestAccount` action and form deleted, route dropped from `proxy.ts` public routes, `POST /api/account-requests` → 410. Login page shows a "Hubungi admin" dialog (`components/auth/ContactAdminDialog.tsx`, copy in `lib/contact-admin.ts`) — parity loop not yet run. |
 | 5 | Home (Beranda) | `/dashboard` | not-enrolled CTA verified visually; other 4 CTA states + overtime card + missed-checkout modal not yet individually verified | `(tabs)/(beranda)/home` (static export) | **Built & verified (baseline state)** | 9.3% | Diff is mostly a data/loading-state mismatch (mobile ref caught mid-spinner, shifting everything below) — layout/color/spacing match closely once theme is aligned. Desktop confirmed unchanged at 1440px. Pull-to-refresh and the missed-checkout modal intentionally not ported (no browser equivalent / not yet built). |
 | 6 | Histori | `/riwayat` | empty-state + filter tabs verified; loading spinner state not individually screenshotted | `(tabs)/(histori)` (static export) | **Built & verified** | 2.3% | Remaining diff is a 1-day default date-range offset (mobile's `new Date(y,m,1).toISOString()` shifts across midnight in non-UTC timezones — a mobile-side quirk, not replicated). Pull-to-refresh not ported (no browser equivalent). |
 | 7 | Izin (list + 3 create forms) | `/izin`, `/izin/baru?type=` | empty-state + filter tabs verified visually; type-picker sheet and create-form validation states built but not individually screenshotted | `(tabs)/(izin)` (static export) | **Built & verified (list)** | 12.6% | Same date-range-offset + loading-state caveats as Histori. Create form reuses `createLeaveRequest` server action directly (no new backend). |

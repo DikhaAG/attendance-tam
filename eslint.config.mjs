@@ -24,6 +24,7 @@ const eslintConfig = defineConfig([
     // Rule modules are pure input → output so both server and client can use
     // them and Vitest can test them without a DB. Add new rule modules here.
     files: [
+      "lib/contact-admin.ts",
       "lib/date.ts",
       "lib/geo.ts",
       "lib/holiday.ts",
