@@ -83,15 +83,9 @@ import {
   type PositionNode,
 } from "@/lib/division";
 import { ROLE_LABEL } from "@/lib/role";
+import { NO_POSITION, type PositionGroup } from "@/lib/division";
 
 export type DivisionPerson = OrgUser & { email: string };
-
-/** Pilihan Jabatan untuk dialog pindah, dikelompokkan per Divisi. */
-export type PositionGroup = {
-  divisionId: string;
-  divisionName: string;
-  positions: { id: string; name: string }[];
-};
 
 type DialogState =
   | { kind: "create-division" }
@@ -104,9 +98,6 @@ type DialogState =
   | null;
 
 type OpenDialog = (state: Exclude<DialogState, null>) => void;
-
-/** Nilai Select untuk "Kosongkan Jabatan" — Radix Select tidak menerima "". */
-const NO_POSITION = "__none__";
 
 export default function DivisionTreeView({
   tree,

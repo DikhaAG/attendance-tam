@@ -6,7 +6,10 @@ import { UserService } from "@/servers/services/user.service";
 
 let clerkSeq = 0;
 
-const createUser = (name: string, extra: { role?: Role; position?: string } = {}) =>
+const createUser = (
+  name: string,
+  extra: { role?: Role; position?: string; positionId?: string | null } = {},
+) =>
   UserService.create({
     clerkId: `user_test_${++clerkSeq}`,
     name,
@@ -94,5 +97,34 @@ describe("hapus hanya kalau kosong", () => {
 
     expect(await DivisionService.deletePosition(teknisi.id)).toEqual({ deleted: true });
     expect(await DivisionService.deleteDivision(division.id)).toEqual({ deleted: true });
+  });
+});
+
+describe("listPositionGroups", () => {
+  it("mengelompokkan Jabatan per Divisi", async () => {
+    const { division, teknisi } = await teknisDivision();
+    const groups = await DivisionService.listPositionGroups();
+    const teknisGroup = groups.find((g) => g.divisionId === division.id);
+
+    expect(teknisGroup).toBeDefined();
+    expect(teknisGroup?.divisionName).toBe("Teknis");
+    expect(
+      teknisGroup?.positions.some((p) => p.id === teknisi.id && p.name === "Teknisi"),
+    ).toBe(true);
+  });
+});
+
+describe("UserService dengan positionId (form pekerja)", () => {
+  it("menetapkan Jabatan lewat assignPosition menyinkronkan nama jabatan dan relasi jobPosition", async () => {
+    const { teknisi } = await teknisDivision();
+    const budi = await createUser("Budi");
+
+    await DivisionService.assignPosition({ userId: budi.id, positionId: teknisi.id });
+
+    const user = await UserService.getById(budi.id);
+    expect(user?.positionId).toBe(teknisi.id);
+    expect(user?.position).toBe("Teknisi");
+    expect(user?.jobPosition?.name).toBe("Teknisi");
+    expect(user?.jobPosition?.division.name).toBe("Teknis");
   });
 });

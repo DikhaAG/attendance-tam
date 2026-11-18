@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildDivisionTree,
+  canHavePosition,
+  formatWorkerPosition,
+  normalizePositionId,
+  NO_POSITION,
   type OrgDivision,
   type OrgPosition,
   type OrgUser,
@@ -102,5 +106,52 @@ describe("puncak pohon dan Belum punya Jabatan", () => {
       "Administrator",
       "tes-dika-1",
     ]);
+  });
+});
+
+describe("canHavePosition (ADR 0001: Manager tidak punya Jabatan)", () => {
+  it("mengembalikan false untuk MANAGER", () => {
+    expect(canHavePosition("MANAGER")).toBe(false);
+  });
+
+  it("mengembalikan true untuk role lain atau kosong", () => {
+    expect(canHavePosition("EMPLOYEE")).toBe(true);
+    expect(canHavePosition("SUPERVISOR")).toBe(true);
+    expect(canHavePosition("ADMIN")).toBe(true);
+    expect(canHavePosition(null)).toBe(true);
+    expect(canHavePosition(undefined)).toBe(true);
+  });
+});
+
+describe("formatWorkerPosition (tabel daftar pekerja)", () => {
+  it("menampilkan Jabatan + Divisi jika keduanya ada", () => {
+    expect(formatWorkerPosition("Teknisi", "Teknis")).toBe("Teknisi · Divisi Teknis");
+  });
+
+  it("menampilkan teks Jabatan saja jika tidak punya Divisi (mis. Manager)", () => {
+    expect(formatWorkerPosition("Business Development Manager", null)).toBe(
+      "Business Development Manager",
+    );
+  });
+
+  it("menampilkan Tanpa jabatan jika Jabatan kosong atau null", () => {
+    expect(formatWorkerPosition(null, null)).toBe("Tanpa jabatan");
+    expect(formatWorkerPosition("", null)).toBe("Tanpa jabatan");
+    expect(formatWorkerPosition(undefined, undefined)).toBe("Tanpa jabatan");
+  });
+});
+
+describe("normalizePositionId (form pekerja & graph)", () => {
+  it("mengembalikan id jabatan bila valid", () => {
+    expect(normalizePositionId("pos_123")).toBe("pos_123");
+    expect(normalizePositionId("  pos_123  ")).toBe("pos_123");
+  });
+
+  it("mengembalikan null untuk NO_POSITION, string kosong, atau null/undefined", () => {
+    expect(normalizePositionId(NO_POSITION)).toBeNull();
+    expect(normalizePositionId("")).toBeNull();
+    expect(normalizePositionId("   ")).toBeNull();
+    expect(normalizePositionId(null)).toBeNull();
+    expect(normalizePositionId(undefined)).toBeNull();
   });
 });

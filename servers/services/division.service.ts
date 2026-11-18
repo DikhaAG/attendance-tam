@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import type { PositionGroup } from "@/lib/division";
 import type {
   AssignPositionDTO,
   DivisionDTO,
@@ -37,6 +38,34 @@ export const DivisionService = {
     ]);
 
     return { divisions, positions, users };
+  },
+
+  /** Pilihan Jabatan dikelompokkan per Divisi — dipakai dropdown form pekerja & graph. */
+  async listPositionGroups(): Promise<PositionGroup[]> {
+    const divisions = await prisma.division.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        positions: {
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    return divisions.map((division) => ({
+      divisionId: division.id,
+      divisionName: division.name,
+      positions: division.positions,
+    }));
+  },
+
+  async getPositionById(id: string) {
+    return prisma.position.findUnique({
+      where: { id },
+      include: { division: true },
+    });
   },
 
   async createDivision(data: DivisionDTO) {

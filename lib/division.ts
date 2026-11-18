@@ -43,6 +43,14 @@ export type DivisionTree<U extends OrgUser = OrgUser> = {
 };
 
 /**
+ * Manager tidak punya Jabatan maupun Divisi (ADR 0001).
+ * Role lain (EMPLOYEE, ADMIN, SUPERVISOR) boleh memiliki Jabatan.
+ */
+export function canHavePosition(role?: string | null): boolean {
+  return role !== "MANAGER";
+}
+
+/**
  * Satu-satunya definisi Supervisor Divisi: Role Supervisor aktif yang punya
  * Jabatan. Divisinya adalah Divisi Jabatan itu (ADR 0001).
  */
@@ -98,3 +106,38 @@ export function buildDivisionTree<U extends OrgUser>(input: {
       .sort(byName),
   };
 }
+
+/** Pilihan Jabatan untuk dropdown form pekerja & graph, dikelompokkan per Divisi. */
+export type PositionGroup = {
+  divisionId: string;
+  divisionName: string;
+  positions: { id: string; name: string }[];
+};
+
+/** Nilai penanda untuk mengosongkan / tanpa Jabatan di Select Radix UI. */
+export const NO_POSITION = "__none__";
+
+/** Normalisasi input positionId dari form pekerja & graph. */
+export function normalizePositionId(value?: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === NO_POSITION) return null;
+  return trimmed;
+}
+
+/**
+ * Format teks Jabatan + Divisi untuk tabel pekerja.
+ * Bila ada Divisi: "Teknisi · Divisi Teknis".
+ * Bila tanpa Divisi (mis. akun tanpa Divisi atau teks jabatan manual): "Business Development Manager".
+ * Bila kosong: "Tanpa jabatan".
+ */
+export function formatWorkerPosition(
+  position?: string | null,
+  divisionName?: string | null,
+): string {
+  const trimmed = position?.trim();
+  if (!trimmed) return "Tanpa jabatan";
+  if (!divisionName?.trim()) return trimmed;
+  return `${trimmed} · Divisi ${divisionName.trim()}`;
+}
+

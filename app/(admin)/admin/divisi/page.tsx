@@ -1,11 +1,10 @@
 import PageHeader from "@/components/dashboard/PageHeader";
 import DivisionTreeView, {
   type DivisionPerson,
-  type PositionGroup,
 } from "@/components/admin/DivisionTreeView";
 import { Role } from "@/generated/prisma";
 import { requireRole } from "@/lib/session";
-import { buildDivisionTree } from "@/lib/division";
+import { buildDivisionTree, type PositionGroup } from "@/lib/division";
 import { DivisionService } from "@/servers/services/division.service";
 
 /**
