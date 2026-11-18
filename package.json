@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "parity:auth": "node scripts/parity/save-auth.mjs",
     "parity:compare": "node scripts/parity/compare.mjs",
-    "parity:capture": "node scripts/parity/capture.mjs"
+    "parity:capture": "node scripts/parity/capture.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -75,6 +76,8 @@
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "tsx": "^4.22.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^7.3.8",
+    "vitest": "^4.1.12"
   }
 }
