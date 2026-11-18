@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 Repo: attendance-tam
 Blocked by: 01
 
@@ -34,7 +34,7 @@ Spec: `../spec.md` (§3 Absen Pulang Terlewat). User story 52–57.
 - [x] Respons `GET /api/attendance/missed` tetap berisi `days` (kompatibel).
 - [x] Mengirim jam pulang tidak sah lewat API (seperti mobile lama) ditolak
       server dengan pesan yang jelas.
-- [ ] Tree mobile web: dialog dicek lewat loop parity; desktop tidak berubah
+- [x] Tree mobile web: dialog dicek lewat loop parity; desktop tidak berubah
       selain isi dialog.
 - [x] lint + `tsc --noEmit` + `npm test` hijau.
 
@@ -49,3 +49,40 @@ Spec: `../spec.md` (§3 Absen Pulang Terlewat). User story 52–57.
 Belum: loop parity tree mobile web. `MOBILE_PARITY.md` mencatat modal ini belum
 di-port ke tree mobile, dan verifikasinya butuh baris absen masuk tanpa absen
 pulang di DB dev untuk akun parity. Status dibiarkan sampai itu dicek.
+
+**2026-11-18 (parity)** — Loop parity dijalankan dengan absen masuk uji Sabtu
+14 Nov 08:02 (Jam Pulang Sabtu 14:00). Isi kedua sisi sama: "Absen pulang hari
+Sabtu, 14 Nov", jam masuk 08:02, "Otomatis pukul 14:00".
+
+`MissedCheckoutDialog` sekarang mobile-first (overlay hitam 50% tanpa blur,
+kartu `rounded-2xl p-5 gap-4`, teks rata tengah, tombol utama di atas) dengan
+`md:` mengembalikan gaya `DialogContent` shadcn. Dirakit dari `DialogPortal` +
+`DialogOverlay` karena `DialogContent` tidak bisa mengatur overlay-nya.
+
+| State | Diff awal | Diff akhir |
+|---|---|---|
+| default (`missed-checkout`) | 76.76% | 4.05% |
+| Pilih jam sendiri (`missed-checkout-custom`) | — | 11.06% |
+
+Sisa diff di luar dialog ini: halaman Beranda di belakang overlay (gap lama
+Home 9.3%), font (Montserrat di web vs Nexa-Regular + bold sintetis di export
+Expo web), dan `@expo/ui` `DateTimePicker` yang tidak dirender sama sekali di
+export web — web tetap memakai `<input type="time">`.
+
+Desktop 1440×900 dibandingkan dengan versi `HEAD`: state default 0 px berbeda;
+state "Pilih jam sendiri" hanya teks tombol "Konfirmasi pulang" → "Konfirmasi
+Pulang" (disamakan dengan mobile).
+
+Catatan setup parity (belum dicatat di `MOBILE_PARITY.md`, sedang disunting
+sesi lain):
+- `../mobile-tam/.env.example` memakai publishable key instance Clerk lama
+  (`clean-gecko-52`); export harus memakai key yang sama dengan dashboard
+  `.env`, dan pakai `npx expo export -p web --clear` — tanpa `--clear` Metro
+  memakai nilai `EXPO_PUBLIC_*` dari cache.
+- API Next tidak mengirim header CORS (aplikasi native tidak butuh), jadi
+  export Expo web di :8081 tidak bisa memanggil :3000. Solusinya proxy
+  same-origin di :8081 (`/api/*` → :3000, sisanya → `serve` dist di :8082) dan
+  export dengan `EXPO_PUBLIC_API_URL=http://localhost:8081`.
+- Akun parity bawaan `save-auth.mjs` tidak ada di instance ini; dipakai akun uji
+  Clerk `parity+clerk_test@example.com` (kredensial di `.env`:
+  `PARITY_EMAIL`/`PARITY_PASSWORD`, jalankan skrip dengan `node --env-file=.env`).
