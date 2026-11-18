@@ -45,7 +45,7 @@ Clerk (email+password), TanStack Query + Table, shadcn/ui.
 
 ```
 app/action/          ← Server Actions: validate input → call Service → revalidatePath
-servers/validators/  ← Zod schemas + DTO types (CreateXSchema, UpdateXSchema)
+servers/validators/  ← Zod schemas + DTO types (naming: CODING_STANDARDS.md)
 servers/services/    ← DB access via Prisma (XService.list / getById / create / update / delete)
 lib/prisma.ts        ← singleton PrismaClient (uses PrismaPg adapter)
 ```
@@ -53,6 +53,11 @@ lib/prisma.ts        ← singleton PrismaClient (uses PrismaPg adapter)
 Actions import validators and services. Services import from `lib/prisma`. Nothing else should touch Prisma directly.
 
 Helper domain (dipakai action, bukan service):
+
+Setiap modul `lib/` otomatis dijaga bebas Prisma/DB/Clerk oleh `no-restricted-imports`
+di `eslint.config.mjs`; modul yang memang butuh Prisma masuk daftar `ignores` di sana.
+Uji modul aturan lewat `lib/**/*.test.ts` (`npm test`); aturan yang hidup di DB
+(transaksi, FK, sinkron kolom) lewat `servers/**/*.int.test.ts` (`npm run test:int`).
 
 - `lib/geo.ts` — `haversineDistance()` (meter) + `formatDistance()`. Bebas Prisma, jadi
   `AttendanceDialog` ikut memakainya di client untuk tahu lebih awal kalau absennya di luar radius.

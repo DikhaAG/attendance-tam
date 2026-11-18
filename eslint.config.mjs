@@ -21,18 +21,26 @@ const eslintConfig = defineConfig([
     rules: { "react-hooks/set-state-in-effect": "off" },
   },
   {
-    // Rule modules are pure input → output so both server and client can use
-    // them and Vitest can test them without a DB. Add new rule modules here.
-    files: [
-      "lib/contact-admin.ts",
-      "lib/date.ts",
-      "lib/division.ts",
-      "lib/geo.ts",
-      "lib/holiday.ts",
-      "lib/missed-checkout.ts",
-      "lib/work-mode.ts",
-      "lib/work-schedule.ts",
-      "lib/**/*.test.ts",
+    // Every `lib/` module is a Prisma-free rule module by default: pure
+    // input → output, usable from client components and testable by Vitest
+    // without a DB. The ignore list is the closed set of modules that are
+    // allowed to reach Prisma/Clerk/services; growing it is a deliberate choice.
+    files: ["lib/**/*.ts"],
+    ignores: [
+      "lib/api-auth.ts",
+      "lib/approval.ts",
+      "lib/attendance-days.ts",
+      "lib/attendance.ts",
+      "lib/daily-recap.ts",
+      "lib/employee-profile.ts",
+      "lib/face-recognition.ts",
+      "lib/field-assignment.ts",
+      "lib/leave.ts",
+      "lib/monthly-report-xlsx.ts",
+      "lib/overtime.ts",
+      "lib/prisma.ts",
+      "lib/role.ts",
+      "lib/session.ts",
     ],
     rules: {
       "no-restricted-imports": [
@@ -48,6 +56,7 @@ const eslintConfig = defineConfig([
                 "@prisma/*",
                 "@/servers/**",
                 "@/lib/session",
+                "./session",
                 "@clerk/*",
               ],
               message:
