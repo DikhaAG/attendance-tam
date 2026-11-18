@@ -15,7 +15,9 @@
     "parity:auth": "node scripts/parity/save-auth.mjs",
     "parity:compare": "node scripts/parity/compare.mjs",
     "parity:capture": "node scripts/parity/capture.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
