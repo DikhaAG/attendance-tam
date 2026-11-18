@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -10,7 +9,6 @@ import {
   Role,
 } from "@/generated/prisma";
 import { requireAnyRole, requireRole, requireUser } from "@/lib/session";
-import { defaultRouteForRole } from "@/lib/role";
 import {
   addDays,
   formatDuration,
@@ -20,10 +18,7 @@ import {
   parseTimeToMinutes,
   workDateTimeToUtc,
 } from "@/lib/date";
-import {
-  OVERTIME_REVIEWER_STAGE,
-  resolveInitialOvertime,
-} from "@/lib/overtime";
+import { resolveInitialOvertime } from "@/lib/overtime";
 import { canStartOvertimeAt, getWorkDayFor } from "@/lib/work-schedule";
 import {
   EndOvertimeSchema,
@@ -32,6 +27,7 @@ import {
   UpdateOvertimeTimeSchema,
 } from "@/servers/validators/overtime.validator";
 import { OvertimeService } from "@/servers/services/overtime.service";
+import { ApprovalRoutingService } from "@/servers/services/approval-routing.service";
 import { AttendanceService } from "@/servers/services/attendance.service";
 import { ApprovalLogService } from "@/servers/services/approval-log.service";
 import { WorkDayService } from "@/servers/services/setting.service";
@@ -234,9 +230,6 @@ export async function reviewOvertime(
   input: z.input<typeof ReviewOvertimeSchema>,
 ): Promise<OvertimeResult> {
   const reviewer = await requireUser();
-  const stage = OVERTIME_REVIEWER_STAGE[reviewer.role];
-
-  if (!stage) redirect(defaultRouteForRole(reviewer.role));
 
   const parsed = ReviewOvertimeSchema.safeParse(input);
 
@@ -247,16 +240,39 @@ export async function reviewOvertime(
     };
   }
 
-  const finalStatus = parsed.data.status;
-
   const current = await OvertimeService.getById(overtimeId);
+
+  if (!current) {
+    return {
+      ok: false,
+      error: "Pengajuan tidak ditemukan",
+    };
+  }
+
+  if (current.status !== AttendanceApproval.PENDING) {
+    return {
+      ok: false,
+      error: "Pengajuan tidak ditemukan atau sudah diproses lebih dulu",
+    };
+  }
+
+  const canReview = await ApprovalRoutingService.canReviewOvertime(reviewer, current);
+
+  if (!canReview) {
+    return {
+      ok: false,
+      error: "Anda tidak memiliki wewenang untuk meninjau pengajuan ini",
+    };
+  }
+
+  const finalStatus = parsed.data.status;
 
   // Ditolak sambil lembur masih berjalan (endAt null) — tutup sesinya
   // sekalian, kalau tidak akan menggantung selamanya dan memblokir
   // karyawan mulai lembur berikutnya (lihat getOpenForUser).
   let closeSession: { endAt: Date; durationMinutes: number } | undefined;
 
-  if (finalStatus === AttendanceApproval.REJECTED && current?.endAt === null) {
+  if (finalStatus === AttendanceApproval.REJECTED && current.endAt === null) {
     const endAt = new Date();
     closeSession = {
       endAt,
@@ -268,7 +284,7 @@ export async function reviewOvertime(
   }
 
   const applied = await OvertimeService.review(overtimeId, {
-    stage,
+    stage: current.stage,
     nextStage: OvertimeStage.DONE,
     status: finalStatus,
     reviewedById: reviewer.id,

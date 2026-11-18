@@ -1,7 +1,8 @@
-import { LeaveStage, OvertimeStage, Role, type User } from "@/generated/prisma";
+import { Role, type User } from "@/generated/prisma";
 import { ownerRolesForAttendanceReviewer } from "@/lib/attendance";
 import { AccountRequestService } from "./account-request.service";
 import { AttendanceService } from "./attendance.service";
+import { ApprovalRoutingService } from "./approval-routing.service";
 import { FieldAssignmentService } from "./field-assignment.service";
 import { LeaveService } from "./leave.service";
 import { OvertimeService } from "./overtime.service";
@@ -20,9 +21,9 @@ export const NotificationService = {
       case Role.ADMIN:
         return this.forAdmin(user);
       case Role.SUPERVISOR:
-        return this.forSupervisor();
+        return this.forSupervisor(user);
       case Role.MANAGER:
-        return this.forManager();
+        return this.forManager(user);
       default:
         return {};
     }
@@ -46,10 +47,11 @@ export const NotificationService = {
   },
 
   /** Antrean supervisor: izin + lembur + verifikasi absensi di giliran supervisor. */
-  async forSupervisor(): Promise<SidebarBadges> {
+  async forSupervisor(user: User): Promise<SidebarBadges> {
+    const scope = await ApprovalRoutingService.getScopeForReviewer(user);
     const [leaves, overtimes, attendanceApprovals] = await Promise.all([
-      LeaveService.countPending(LeaveStage.SUPERVISOR),
-      OvertimeService.countPending(OvertimeStage.SUPERVISOR),
+      LeaveService.countPending(scope),
+      OvertimeService.countPending(scope),
       AttendanceService.countPendingApprovalForOwnerRoles(
         ownerRolesForAttendanceReviewer(Role.SUPERVISOR),
       ),
@@ -63,11 +65,12 @@ export const NotificationService = {
   },
 
   /** Antrean manager: izin + lembur + dinas luar + verifikasi absensi milik supervisor. */
-  async forManager(): Promise<SidebarBadges> {
+  async forManager(user: User): Promise<SidebarBadges> {
+    const scope = await ApprovalRoutingService.getScopeForReviewer(user);
     const [leaves, overtimes, fieldAssignments, attendanceApprovals] =
       await Promise.all([
-        LeaveService.countPending(LeaveStage.MANAGER),
-        OvertimeService.countPending(OvertimeStage.MANAGER),
+        LeaveService.countPending(scope),
+        OvertimeService.countPending(scope),
         FieldAssignmentService.countPending(),
         AttendanceService.countPendingApprovalForOwnerRoles(
           ownerRolesForAttendanceReviewer(Role.MANAGER),
