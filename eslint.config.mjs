@@ -26,6 +26,7 @@ const eslintConfig = defineConfig([
     files: [
       "lib/contact-admin.ts",
       "lib/date.ts",
+      "lib/division.ts",
       "lib/geo.ts",
       "lib/holiday.ts",
       "lib/missed-checkout.ts",
