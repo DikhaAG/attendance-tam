@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  autoCheckOutTimeFor,
   canStartOvertimeAt,
   getWorkDayFor,
   hasValidOvertimeStart,
@@ -8,6 +9,7 @@ import {
   isLateAt,
   isNonWorkingDate,
   lateMinutesAt,
+  missedCheckoutTimeError,
   summarizeWeek,
   type WorkDayConfig,
 } from "@/lib/work-schedule";
@@ -130,6 +132,39 @@ describe("Jam Mulai Lembur", () => {
   it("tabel WorkDay kosong: Lembur mulai 18:00 dari jadwal bawaan", () => {
     expect(canStartOvertimeAt(at("17:59"), getWorkDayFor(MONDAY, []))).toBe(false);
     expect(canStartOvertimeAt(at("18:00"), getWorkDayFor(MONDAY, []))).toBe(true);
+  });
+});
+
+describe("Absen Pulang Terlewat: jam otomatis", () => {
+  it("Sabtu otomatis pukul 14:00, Senin otomatis pukul 17:00", () => {
+    expect(autoCheckOutTimeFor(SATURDAY, WEEK_WITH_SHORT_SATURDAY)).toBe("14:00");
+    expect(autoCheckOutTimeFor(MONDAY, WEEK_WITH_SHORT_SATURDAY)).toBe("17:00");
+  });
+
+  it("tabel WorkDay kosong: jatuh ke Jam Pulang jadwal bawaan 17:00", () => {
+    expect(autoCheckOutTimeFor(SATURDAY, [])).toBe("17:00");
+  });
+});
+
+describe("Absen Pulang Terlewat: jam pulang harus setelah jam masuk", () => {
+  it("pulang 05:00 dengan masuk 08:00 ditolak, pesannya menyebut jam masuk", () => {
+    expect(missedCheckoutTimeError("05:00", "08:00")).toBe(
+      "Jam pulang harus setelah jam masuk 08:00",
+    );
+  });
+
+  it("pulang 07:01 dengan masuk 08:02 ditolak", () => {
+    expect(missedCheckoutTimeError("07:01", "08:02")).toBe(
+      "Jam pulang harus setelah jam masuk 08:02",
+    );
+  });
+
+  it("pulang sama dengan jam masuk ditolak", () => {
+    expect(missedCheckoutTimeError("08:00", "08:00")).not.toBeNull();
+  });
+
+  it("pulang 14:00 dengan masuk 08:00 diterima", () => {
+    expect(missedCheckoutTimeError("14:00", "08:00")).toBeNull();
   });
 });
 

@@ -47,10 +47,12 @@ import { FaceService } from "@/servers/services/face.service";
 import { UserService } from "@/servers/services/user.service";
 import { verifyFace, FaceApiError } from "@/lib/face-recognition";
 import {
+  autoCheckOutTimeFor,
   getWorkDayFor,
   isCheckInClosed,
   isLateAt,
   lateMinutesAt,
+  missedCheckoutTimeError,
   type WorkDayConfig,
 } from "@/lib/work-schedule";
 
@@ -810,14 +812,16 @@ export async function updateAttendanceTime(
   };
 }
 
-/** Absen pulang default kalau karyawan tidak memilih jam sendiri. */
-const DEFAULT_MISSED_CHECKOUT_TIME = "17:00";
-
 /**
  * Karyawan mengonfirmasi sendiri absen pulang yang terlewat pada hari
  * sebelumnya — dipicu dari modal yang memblokir absen masuk baru selama masih
  * ada hari yang belum diselesaikan (lihat `listUnresolvedCheckouts` di
  * `submitAttendance`).
+ *
+ * `time` kosong = jam otomatis, yaitu Jam Pulang Hari Kerja tanggal itu
+ * (`autoCheckOutTimeFor`). Jam apa pun — otomatis atau dipilih — harus sesudah
+ * jam absen masuk. Pengecekan di sini yang menentukan, karena mobile versi
+ * lama tidak memvalidasi di client.
  */
 export async function confirmMissedCheckout(
   input: z.input<typeof ConfirmMissedCheckoutSchema>,
@@ -844,7 +848,7 @@ export async function confirmMissedCheckout(
     };
   }
 
-  const [checkIn, checkOut] = await Promise.all([
+  const [checkIn, checkOut, workDays] = await Promise.all([
     AttendanceService.findByUserDateType(
       user.id,
       workDate,
@@ -855,6 +859,7 @@ export async function confirmMissedCheckout(
       workDate,
       AttendanceType.CHECK_OUT,
     ),
+    WorkDayService.list(),
   ]);
 
   if (!checkIn) {
@@ -865,7 +870,12 @@ export async function confirmMissedCheckout(
     return { ok: false, error: "Absen pulang tanggal itu sudah tercatat" };
   }
 
-  const time = parsed.data.time?.trim() || DEFAULT_MISSED_CHECKOUT_TIME;
+  const time =
+    parsed.data.time?.trim() || autoCheckOutTimeFor(workDate, workDays);
+  const timeError = missedCheckoutTimeError(time, formatTime(checkIn.timestamp));
+
+  if (timeError) return { ok: false, error: timeError };
+
   const timestamp = workDateTimeToUtc(workDate, time);
 
   if (!timestamp) {

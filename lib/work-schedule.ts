@@ -114,7 +114,10 @@ export function isLateAt(
  * "terlambat" (10 < 15), tapi tetap dihitung 10 menit di sini. Absen jam
  * 08:20 → "terlambat" dan dihitung 20 menit di sini.
  */
-export function lateMinutesAt(minutesOfDay: number, day: WorkDayConfig): number {
+export function lateMinutesAt(
+  minutesOfDay: number,
+  day: WorkDayConfig,
+): number {
   if (!day.isWorkingDay) return 0;
 
   const start = parseTimeToMinutes(day.checkInTime);
@@ -161,14 +164,51 @@ export function canStartOvertimeAt(
  * (sama seperti aturan jam masuk/pulang di validator).
  */
 export function hasValidOvertimeStart(
-  day: Pick<WorkDayConfig, "isWorkingDay" | "checkOutTime" | "overtimeStartTime">,
+  day: Pick<
+    WorkDayConfig,
+    "isWorkingDay" | "checkOutTime" | "overtimeStartTime"
+  >,
 ): boolean {
   if (!day.isWorkingDay) return true;
 
   const checkOut = parseTimeToMinutes(day.checkOutTime);
   const overtimeStart = parseTimeToMinutes(day.overtimeStartTime);
 
-  return checkOut !== null && overtimeStart !== null && overtimeStart >= checkOut;
+  return (
+    checkOut !== null && overtimeStart !== null && overtimeStart >= checkOut
+  );
+}
+
+/**
+ * Jam pulang yang dicatat saat karyawan menekan "Otomatis" untuk Absen Pulang
+ * Terlewat: Jam Pulang Hari Kerja tanggal yang dikonfirmasi (Sabtu 14:00, hari
+ * biasa 17:00), bukan jam tetap. Hari libur tetap memakai Jam Pulang yang
+ * tersimpan untuk hari itu.
+ */
+export function autoCheckOutTimeFor(date: Date, days: WorkDayConfig[]): string {
+  return getWorkDayFor(date, days).checkOutTime;
+}
+
+/**
+ * Validasi Absen Pulang Terlewat: jam pulang ("HH:mm") harus sesudah jam absen
+ * masuk ("HH:mm") tanggal itu — mencegah data seperti pulang 05:00 untuk masuk
+ * 08:00, yang terjadi saat karyawan mengira yang diminta adalah jam saat ini.
+ * Mengembalikan pesan error (menyebut jam masuk) atau null kalau sah. Dipakai
+ * server (penentu) maupun dialog client, supaya pesannya sama.
+ */
+export function missedCheckoutTimeError(
+  checkOutTime: string,
+  checkInTime: string,
+): string | null {
+  const checkOut = parseTimeToMinutes(checkOutTime);
+  const checkIn = parseTimeToMinutes(checkInTime);
+
+  if (checkOut === null) return "Format jam harus HH:mm";
+  if (checkIn !== null && checkOut <= checkIn) {
+    return `Jam pulang harus setelah jam masuk ${checkInTime}`;
+  }
+
+  return null;
 }
 
 /** "08:00 – 17:00" atau "Libur". */
