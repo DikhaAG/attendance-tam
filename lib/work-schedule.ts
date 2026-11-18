@@ -15,6 +15,8 @@ export type WorkDayConfig = {
   checkInTime: string;
   /** "HH:mm" */
   checkOutTime: string;
+  /** "HH:mm" — Jam Mulai Lembur, berdiri sendiri (tidak ikut Jam Pulang). */
+  overtimeStartTime: string;
 };
 
 export const DAY_LABEL: Record<number, string> = {
@@ -40,13 +42,17 @@ export const DAY_SHORT_LABEL: Record<number, string> = {
 /** Urutan tampilan: minggu kerja dimulai Senin, Minggu di paling akhir. */
 export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
-/** Dipakai kalau tabel `WorkDay` belum terisi — Senin–Jumat 08:00–17:00. */
+/**
+ * Dipakai kalau tabel `WorkDay` belum terisi — Senin–Jumat 08:00–17:00,
+ * Lembur mulai 18:00.
+ */
 export const DEFAULT_WORK_DAYS: WorkDayConfig[] = WEEK_ORDER.map(
   (dayOfWeek) => ({
     dayOfWeek,
     isWorkingDay: dayOfWeek >= 1 && dayOfWeek <= 5,
     checkInTime: "08:00",
     checkOutTime: "17:00",
+    overtimeStartTime: "18:00",
   }),
 );
 
@@ -130,6 +136,39 @@ export function isCheckInClosed(
   const end = parseTimeToMinutes(day.checkOutTime);
 
   return end !== null && minutesOfDay >= end;
+}
+
+/**
+ * Lembur boleh dimulai pada `minutesOfDay` kalau sudah sampai Jam Mulai Lembur
+ * Hari Kerja itu. Satu-satunya batas jam mulai Lembur untuk karyawan — koreksi
+ * jam Lembur oleh admin sengaja tidak terikat aturan ini.
+ *
+ * Hanya butuh `overtimeStartTime`, jadi form client cukup mengirim jam itu.
+ */
+export function canStartOvertimeAt(
+  minutesOfDay: number,
+  day: Pick<WorkDayConfig, "overtimeStartTime">,
+): boolean {
+  const start = parseTimeToMinutes(day.overtimeStartTime);
+
+  return start !== null && minutesOfDay >= start;
+}
+
+/**
+ * Aturan menu Waktu Kerja: Jam Mulai Lembur tidak boleh lebih awal dari Jam
+ * Pulang hari itu, supaya Lembur tidak tumpang tindih dengan kerja normal.
+ * Hari libur tidak dicek — jamnya hanya disimpan untuk saat diaktifkan lagi
+ * (sama seperti aturan jam masuk/pulang di validator).
+ */
+export function hasValidOvertimeStart(
+  day: Pick<WorkDayConfig, "isWorkingDay" | "checkOutTime" | "overtimeStartTime">,
+): boolean {
+  if (!day.isWorkingDay) return true;
+
+  const checkOut = parseTimeToMinutes(day.checkOutTime);
+  const overtimeStart = parseTimeToMinutes(day.overtimeStartTime);
+
+  return checkOut !== null && overtimeStart !== null && overtimeStart >= checkOut;
 }
 
 /** "08:00 – 17:00" atau "Libur". */

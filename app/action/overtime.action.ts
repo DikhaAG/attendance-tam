@@ -21,10 +21,10 @@ import {
   workDateTimeToUtc,
 } from "@/lib/date";
 import {
-  isOvertimeStartAllowed,
   OVERTIME_REVIEWER_STAGE,
   resolveInitialOvertime,
 } from "@/lib/overtime";
+import { canStartOvertimeAt, getWorkDayFor } from "@/lib/work-schedule";
 import {
   EndOvertimeSchema,
   ReviewOvertimeSchema,
@@ -34,6 +34,7 @@ import {
 import { OvertimeService } from "@/servers/services/overtime.service";
 import { AttendanceService } from "@/servers/services/attendance.service";
 import { ApprovalLogService } from "@/servers/services/approval-log.service";
+import { WorkDayService } from "@/servers/services/setting.service";
 
 export type OvertimeResult =
   | { ok: true; message: string }
@@ -68,7 +69,8 @@ function revalidateOvertimePages() {
 
 /**
  * Mulai lembur. Hanya boleh kalau absen pulang hari ini sudah tercatat, belum
- * ada sesi lembur lain yang berjalan, dan jam mulai yang dipilih >= 18:00.
+ * ada sesi lembur lain yang berjalan, dan jam mulai yang dipilih sudah sampai
+ * Jam Mulai Lembur Hari Kerja hari ini (`canStartOvertimeAt()`).
  */
 export async function startOvertime(
   input: z.input<typeof StartOvertimeSchema>,
@@ -106,10 +108,12 @@ export async function startOvertime(
     return { ok: false, error: "Jam mulai lembur tidak valid" };
   }
 
-  if (!isOvertimeStartAllowed(minutesOfDay)) {
+  const today = getWorkDayFor(workDate, await WorkDayService.list());
+
+  if (!canStartOvertimeAt(minutesOfDay, today)) {
     return {
       ok: false,
-      error: "Lembur hanya bisa dimulai pukul 18:00 atau lebih larut",
+      error: `Lembur hari ini baru bisa dimulai pukul ${today.overtimeStartTime}`,
     };
   }
 
@@ -309,7 +313,7 @@ export async function reviewOvertime(
  * menyelesaikan lembur sampai jauh malam. Status approval tidak berubah, jam
  * aslinya disimpan (`originalStartAt`/`originalEndAt`), dan durasi dihitung ulang.
  *
- * Aturan "mulai >= 18:00" sengaja tidak diberlakukan di sini: itu pembatas
+ * Aturan Jam Mulai Lembur sengaja tidak diberlakukan di sini: itu pembatas
  * untuk karyawan yang memulai lembur, bukan untuk koreksi admin atas data
  * yang sudah ada. `endTime` yang lebih awal dari `startTime` dianggap melewati
  * tengah malam, sama seperti `endOvertime`.

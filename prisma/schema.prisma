@@ -385,14 +385,17 @@ model WorkSchedule {
 
 /// Satu baris per hari dalam seminggu — selalu 7 baris.
 model WorkDay {
-  id           String   @id @default(cuid())
+  id                String   @id @default(cuid())
   /// 0 = Minggu … 6 = Sabtu, sama dengan `Date#getUTCDay()`
-  dayOfWeek    Int      @unique
-  isWorkingDay Boolean  @default(true)
-  checkInTime  String // "HH:mm"
-  checkOutTime String // "HH:mm"
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  dayOfWeek         Int      @unique
+  isWorkingDay      Boolean  @default(true)
+  checkInTime       String // "HH:mm"
+  checkOutTime      String // "HH:mm"
+  /// Jam Mulai Lembur ("HH:mm") — berdiri sendiri, tidak ikut berubah saat
+  /// `checkOutTime` diubah. Diisi `checkOutTime` + 1 jam oleh migrasinya.
+  overtimeStartTime String   @default("18:00")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Attendance {

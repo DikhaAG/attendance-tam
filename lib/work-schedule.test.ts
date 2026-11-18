@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canStartOvertimeAt,
   getWorkDayFor,
+  hasValidOvertimeStart,
   isCheckInClosed,
   isLateAt,
   isNonWorkingDate,
@@ -12,16 +14,17 @@ import {
 
 /**
  * Hari Kerja yang berlaku sekarang (Sabtu pulang lebih awal):
- * Senin–Jumat 08:00–17:00, Sabtu 08:00–14:00, Minggu libur.
+ * Senin–Jumat 08:00–17:00, Sabtu 08:00–14:00, Minggu libur. Jam Mulai Lembur
+ * sesuai data produksi setelah migrasi: Jam Pulang + 1 jam.
  */
 const WEEK_WITH_SHORT_SATURDAY: WorkDayConfig[] = [
-  { dayOfWeek: 0, isWorkingDay: false, checkInTime: "08:00", checkOutTime: "17:00" },
-  { dayOfWeek: 1, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00" },
-  { dayOfWeek: 2, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00" },
-  { dayOfWeek: 3, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00" },
-  { dayOfWeek: 4, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00" },
-  { dayOfWeek: 5, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00" },
-  { dayOfWeek: 6, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "14:00" },
+  { dayOfWeek: 0, isWorkingDay: false, checkInTime: "08:00", checkOutTime: "17:00", overtimeStartTime: "18:00" },
+  { dayOfWeek: 1, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00", overtimeStartTime: "18:00" },
+  { dayOfWeek: 2, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00", overtimeStartTime: "18:00" },
+  { dayOfWeek: 3, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00", overtimeStartTime: "18:00" },
+  { dayOfWeek: 4, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00", overtimeStartTime: "18:00" },
+  { dayOfWeek: 5, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00", overtimeStartTime: "18:00" },
+  { dayOfWeek: 6, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "14:00", overtimeStartTime: "15:00" },
 ];
 
 const TOLERANCE_MINUTES = 15;
@@ -110,5 +113,41 @@ describe("ringkasan minggu", () => {
       totalLabel: "0j",
       scheduleLabel: "Belum ada hari kerja",
     });
+  });
+});
+
+describe("Jam Mulai Lembur", () => {
+  it("Sabtu Lembur boleh dimulai pukul 15:00, belum boleh pukul 14:30", () => {
+    expect(canStartOvertimeAt(at("15:00"), dayOf(SATURDAY))).toBe(true);
+    expect(canStartOvertimeAt(at("14:30"), dayOf(SATURDAY))).toBe(false);
+  });
+
+  it("Senin Lembur belum boleh pukul 17:30, boleh mulai 18:00", () => {
+    expect(canStartOvertimeAt(at("17:30"), dayOf(MONDAY))).toBe(false);
+    expect(canStartOvertimeAt(at("18:00"), dayOf(MONDAY))).toBe(true);
+  });
+
+  it("tabel WorkDay kosong: Lembur mulai 18:00 dari jadwal bawaan", () => {
+    expect(canStartOvertimeAt(at("17:59"), getWorkDayFor(MONDAY, []))).toBe(false);
+    expect(canStartOvertimeAt(at("18:00"), getWorkDayFor(MONDAY, []))).toBe(true);
+  });
+});
+
+describe("pengaturan Jam Mulai Lembur di menu Waktu Kerja", () => {
+  const saturday = dayOf(SATURDAY);
+
+  it("Jam Mulai Lembur sebelum Jam Pulang ditolak", () => {
+    expect(hasValidOvertimeStart({ ...saturday, overtimeStartTime: "13:30" })).toBe(false);
+  });
+
+  it("Jam Mulai Lembur sama dengan atau sesudah Jam Pulang diterima", () => {
+    expect(hasValidOvertimeStart({ ...saturday, overtimeStartTime: "14:00" })).toBe(true);
+    expect(hasValidOvertimeStart(saturday)).toBe(true);
+  });
+
+  it("hari libur tidak dicek — jamnya hanya disimpan untuk saat diaktifkan lagi", () => {
+    expect(
+      hasValidOvertimeStart({ ...dayOf(SUNDAY), overtimeStartTime: "07:00" }),
+    ).toBe(true);
   });
 });
