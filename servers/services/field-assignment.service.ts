@@ -1,5 +1,10 @@
 import prisma from "@/lib/prisma";
-import { AttendanceApproval, TransportationType } from "@/generated/prisma";
+import {
+  AttendanceApproval,
+  Prisma,
+  Role,
+  TransportationType,
+} from "@/generated/prisma";
 
 export type FieldAssignmentListOptions = {
   createdById?: string;
@@ -18,7 +23,54 @@ function fieldAssignmentWhere(opts: FieldAssignmentListOptions) {
   return and.length ? { AND: and } : {};
 }
 
+/** Supervisor pembuat Dinas luar — Divisinya dibaca lewat Jabatan (ADR 0001). */
+export type FieldAssignmentCreator = { positionId: string | null };
+
+/**
+ * Karyawan yang boleh ditugaskan seorang Supervisor: EMPLOYEE aktif di Divisi
+ * Supervisor itu. Supervisor tanpa Jabatan boleh memilih semua karyawan
+ * (spec §2 Dinas luar). Satu filter untuk pemilih dan validasi server.
+ */
+async function assignableWhere(
+  creator: FieldAssignmentCreator,
+): Promise<Prisma.UserWhereInput> {
+  const base: Prisma.UserWhereInput = { role: Role.EMPLOYEE, isActive: true };
+
+  if (!creator.positionId) return base;
+
+  const position = await prisma.position.findUnique({
+    where: { id: creator.positionId },
+    select: { divisionId: true },
+  });
+
+  if (!position) return base;
+
+  return { ...base, jobPosition: { divisionId: position.divisionId } };
+}
+
 export const FieldAssignmentService = {
+  /** Pilihan karyawan saat Supervisor membuat Dinas luar (form web & `GET /api/users`). */
+  async listAssignableEmployees(creator: FieldAssignmentCreator) {
+    return prisma.user.findMany({
+      where: await assignableWhere(creator),
+      select: { id: true, name: true, position: true },
+      orderBy: { name: "asc" },
+    });
+  },
+
+  /** True kalau semua id termasuk karyawan yang boleh ditugaskan Supervisor ini. */
+  async areAssignable(
+    creator: FieldAssignmentCreator,
+    employeeIds: string[],
+  ): Promise<boolean> {
+    const uniqueIds = [...new Set(employeeIds)];
+    const count = await prisma.user.count({
+      where: { ...(await assignableWhere(creator)), id: { in: uniqueIds } },
+    });
+
+    return count === uniqueIds.length;
+  },
+
   async list(opts: FieldAssignmentListOptions = {}) {
     return prisma.fieldAssignment.findMany({
       where: fieldAssignmentWhere(opts),
