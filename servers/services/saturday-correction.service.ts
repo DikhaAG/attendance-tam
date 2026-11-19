@@ -27,6 +27,18 @@ type Db = Prisma.TransactionClient;
 type Failure = { ok: false; error: string };
 
 async function checkMigration(db: Db): Promise<Failure | null> {
+  // DB kosong (restore gagal) atau bukan DB aplikasi: berhenti dengan pesan
+  // jelas, bukan error Prisma "relation does not exist".
+  const [table] = await db.$queryRaw<{ exists: boolean }[]>`
+    SELECT to_regclass('"_prisma_migrations"') IS NOT NULL AS exists`;
+  if (!table?.exists) {
+    return {
+      ok: false,
+      error:
+        "Tabel _prisma_migrations tidak ada — database ini kosong atau bukan database aplikasi. Sudah di-restore?",
+    };
+  }
+
   const [row] = await db.$queryRaw<{ applied: boolean }[]>`
     SELECT EXISTS (
       SELECT 1 FROM "_prisma_migrations"
