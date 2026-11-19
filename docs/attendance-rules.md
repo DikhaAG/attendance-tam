@@ -1,7 +1,7 @@
 # Aturan absensi & rekap
 
 Cara kehadiran diterjemahkan jadi status rekap, approval absen luar radius,
-penambahan/koreksi oleh admin, dan absensi menggantung. Istilah mengikuti
+penambahan/koreksi oleh admin, dan Absen Pulang Terlewat. Istilah mengikuti
 `GLOSSARY.md`.
 
 **Klasifikasi kehadiran.** `RecapStatus` di `lib/attendance.ts` punya tujuh nilai:
@@ -41,18 +41,19 @@ karakter — tidak ada pilihan mode, tidak ada WFH), lalu disimpan dengan
 
 `LUAR_RADIUS` ini beda kasus dari `FieldAssignment` ("Dinas Luar" di menu supervisor/admin):
 `FieldAssignment` adalah penugasan dinas luar yang **direncanakan duluan**
-(tanggal, tujuan, biaya, dst.) oleh supervisor dan disetujui admin — begitu
+(tanggal, tujuan, biaya, dst.) oleh supervisor dan disetujui Manager — begitu
 disetujui, karyawan yang ditugaskan tidak perlu absen sama sekali sepanjang
-rentang tanggalnya. Approval Absensi di `/admin/verifikasi` adalah untuk kasus
-dadakan/tidak direncanakan: karyawan tetap absen (foto + GPS) dari luar radius
-dan admin menilai per kejadian.
+rentang tanggalnya. Approval Absensi adalah untuk kasus dadakan/tidak
+direncanakan: karyawan tetap absen (foto + GPS) dari luar radius dan reviewer
+menilai per kejadian.
 
 Sakit/izin/cuti tidak bisa diklaim dari form absensi — jalurnya tetap pengajuan
-`LeaveRequest` di `/izin`. Admin masih bisa menimpanya jadi salah satu itu saat
+`LeaveRequest` di `/izin`. Reviewer masih bisa menimpanya jadi salah satu itu saat
 menyetujui.
 
-Admin memutuskan di `/admin/verifikasi`: **setujui** (dengan mode apa pun dari
-`APPROVAL_MODES`, termasuk menimpa klaim karyawan lewat `approvedMode`) atau
+Reviewer memutuskan di `/supervisor/verifikasi`, `/manager/verifikasi`, atau
+`/admin/verifikasi` (siapa melihat absensi siapa: `docs/approval-routing.md`):
+**setujui** (dengan mode apa pun dari `APPROVAL_MODES`, termasuk menimpa klaim karyawan lewat `approvedMode`) atau
 **tolak** (absensi dianulir, hari itu `ALFA`). Menyetujui sebagai `HADIR_DIKANTOR`
 berarti GPS-nya dianggap meleset, jadi `isLate` dihitung ulang dari jam absen
 aslinya.
@@ -65,7 +66,7 @@ diperlakukan seolah tidak pernah ada.
 
 `PENDING` sengaja jadi **penanda** (`pendingApproval` di `RecapRow`/`ReportRow`),
 bukan status tersendiri: harinya tetap terbaca sebagai mode yang diklaim karyawan,
-dengan catatan bahwa admin belum memutuskan.
+dengan catatan bahwa reviewer belum memutuskan.
 
 **Penambahan & koreksi absensi oleh admin.** Fitur pengajuan koreksi absensi sudah
 dihapus; penggantinya dua aksi khusus `ADMIN`, tanpa antrean review (admin yang
@@ -85,8 +86,8 @@ melakukan bertanggung jawab, alasan selalu wajib):
   dan tidak boleh di masa depan.
 - `updateOvertimeTime()` + `EditOvertimeTimeDialog` (di `/admin/lembur`) — mengoreksi
   jam mulai/selesai lembur; status approval tidak berubah, durasi dihitung ulang,
-  jam asli di `originalStartAt`/`originalEndAt`. Aturan "mulai >= 18:00" sengaja
-  tidak berlaku untuk koreksi admin. Jam selesai < jam mulai = melewati tengah malam.
+  jam asli di `originalStartAt`/`originalEndAt`. Batas Jam Mulai Lembur
+  (`canStartOvertimeAt()`) sengaja tidak berlaku untuk koreksi admin. Jam selesai < jam mulai = melewati tengah malam.
 
 `isManual` **bukan** penanda "dari admin": `selfConfirmCheckout()` (karyawan
 mengonfirmasi absen pulangnya sendiri) juga menyalakannya. Pakai `createdByAdminId`
@@ -113,13 +114,14 @@ begitu `type` = `CHECK_OUT`; baris yang tersimpan punya `latitude`/`longitude`/
 (`AttendanceDialog`, `attendance-capture-screen`, dan `mobile/src/app/attendance-capture.tsx`)
 sengaja tidak membaca GPS untuk `CHECK_OUT`, dan tidak butuh titik kantor sudah diatur.
 
-**Absensi menggantung** (absen masuk ada, absen pulang tidak pernah tercatat)
+**Absen Pulang Terlewat** (absen masuk ada, absen pulang tidak pernah tercatat)
 tidak ditutup oleh cron. Hari itu terbaca lewat `isMissingCheckOut()` dan
 `AttendanceService.listUnresolvedCheckouts()`. Saat karyawan hendak absen masuk lagi,
 `submitAttendance` menolak sampai hari yang menggantung dikonfirmasi lewat
-`confirmMissedCheckout()`: karyawan menekan **"Otomatis pukul 17:00"** (jam pulang hari
-itu diisi 17:00 tanpa memilih jam — `time` dikosongkan, server memakai
-`DEFAULT_MISSED_CHECKOUT_TIME`) atau memilih jam sendiri. UI-nya `MissedCheckoutDialog`
+`confirmMissedCheckout()`: karyawan menekan **"Otomatis pukul <Jam Pulang>"** (jam pulang
+diisi Jam Pulang Hari Kerja tanggal itu, mis. Sabtu 14:00 — `time` dikosongkan, server
+memakai `autoCheckOutTimeFor()`) atau memilih jam sendiri. Jam apa pun harus sesudah jam
+absen masuk (`missedCheckoutTimeError()`). UI-nya `MissedCheckoutDialog`
 di web (dipasang di `SelfAttendanceDashboard`) dan `MissedCheckoutModal` di mobile.
 Baris hasilnya `isManual` tanpa foto/GPS. Admin tetap bisa mencatat manual di
 `/admin/kehadiran`.

@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 Repo: attendance-tam (+ catatan singkat di mobile-tam bila ada CLAUDE.md/README yang menyebut aturan 18:00 / 17:00 / request account)
 Blocked by: 02, 04, 07, 09, 11
 
@@ -28,6 +28,35 @@ fitur ditutup dan diganti dialog Hubungi Admin.
 
 ## Kriteria selesai
 
-- [ ] Tidak ada lagi klaim di dokumen yang bertentangan dengan kode (cek
+- [x] Tidak ada lagi klaim di dokumen yang bertentangan dengan kode (cek
       grep "18:00", "17:00", "request-account", "disetujui admin").
-- [ ] Istilah mengikuti `GLOSSARY.md`.
+- [x] Istilah mengikuti `GLOSSARY.md`.
+
+## Comments
+
+**2026-11-19** — Diperbarui:
+- `CLAUDE.md`: Dinas luar disetujui Manager; `(employee)` = `requireUser()` semua
+  role; grup `(supervisor)`/`(manager)`; `/admin/divisi`; `npm test` di Commands;
+  User 4 Role + `positionId`, model Division/Position; `WorkDay.overtimeStartTime`;
+  `canStartOvertimeAt()`/`autoCheckOutTimeFor()`; request account ditutup (410) +
+  `ContactAdminDialog`; badge mengikuti cakupan routing. Detail routing dipindah
+  ke pointer, bukan ditulis di CLAUDE.md (tetap ramping).
+- `docs/approval-routing.md` (baru): tabel aturan tahap × reviewer, modul
+  `lib/approval-routing.ts` + `ApprovalRoutingService`, absen luar radius
+  (tiket 12), pemilih Dinas luar per Divisi (tiket 13), `scripts/pemetaan-divisi.ts`
+  (tiket 14).
+- `docs/attendance-rules.md`: Dinas luar → Manager; reviewer absen luar radius
+  per routing; batas Lembur = Jam Mulai Lembur; "Otomatis pukul <Jam Pulang>"
+  (`autoCheckOutTimeFor()`); "absensi menggantung" → Absen Pulang Terlewat.
+- `README.md`: request account dihapus dari fitur/struktur, `ACCOUNT_REQUEST_SECRET`
+  ditandai hanya untuk pengajuan lama; tambah Divisi & Jabatan, Hubungi Admin,
+  Jam Mulai Lembur, Dinas luar disetujui manager; script `typecheck`, `test`,
+  `test:int`, `check`.
+- `MOBILE_PARITY.md`: baris #4 sudah bercatatan (tiket 07); daftar state Auth
+  tidak lagi menyebut form request-account.
+- mobile-tam `README.md` (cabang `spec/divisi-sabtu-request-account`): request
+  account → dialog Hubungi Admin; Lembur memakai Jam Mulai Lembur.
+
+Grep `18:00|17:00|request-account|disetujui admin` di `*.md` luar `.scratch/`:
+sisa hanya GLOSSARY (_Avoid_) dan catatan "closed" di MOBILE_PARITY/README/CLAUDE.md
+— tidak ada klaim yang bertentangan dengan kode.

@@ -234,10 +234,10 @@ per-screen UI/state breakdown (already gathered during audit, condensed
 here; expand inline in this file as each screen is built if new states are
 discovered):
 
-**Auth (5):** welcome (static hero), login (email/password, inline error,
-submit spinner), forgot-password (email→code, inline error, spinner),
-reset-password (code+new password, inline error, spinner), request-account
-(form + separate success/submitted view).
+**Auth (4):** welcome (static hero), login (email/password, inline error,
+submit spinner, "Hubungi Admin" dialog), forgot-password (email→code, inline
+error, spinner), reset-password (code+new password, inline error, spinner).
+request-account is closed — redirect to login only (checklist #4).
 
 **Beranda/Home (1, richest screen ~600 LOC):** header band (avatar, greeting,
 notification bell+badge), overlapping status card (date, office location,

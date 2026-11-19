@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Scripts live in `package.json`. Before committing, run `npm run check`: the same
 gate CI runs (Prisma schema + migrations, lint, typecheck, Vitest unit and integration
 tests). For offline or sandboxed checks without a local Postgres, run `npm run check:unit`.
+Unit tests alone: `npm test` (Vitest).
 Production migrations: `npx prisma migrate deploy`.
 
 **Running the app** (dev server, seed, parity loop) needs `.env`: copy
@@ -21,19 +22,20 @@ will stay unverified.
 ## Architecture
 
 Sistem absensi karyawan (MVP, ~30 karyawan): absen masuk/pulang dengan foto +
-verifikasi wajah + GPS, absen luar kantor (Approval Absensi) yang butuh
-approval admin, penugasan dinas luar (`FieldAssignment`) yang direncanakan
-supervisor & disetujui admin, pengajuan izin/cuti, dan rekap untuk admin.
+verifikasi wajah + GPS, absen luar radius (Approval Absensi), penugasan dinas
+luar (`FieldAssignment`) yang direncanakan supervisor & disetujui **Manager**,
+pengajuan izin/cuti dan Lembur, dan rekap untuk admin.
 Tidak ada WFH — tidak diperbolehkan di sistem ini.
 Stack: Next.js 16 App Router, React 19, TypeScript, Tailwind v4, Prisma 7 + PostgreSQL,
 Clerk (email+password), TanStack Query + Table, shadcn/ui.
 
 ### Route groups
 
-- `app/(auth)/` — `/login` (redirect ke dashboard sesuai role kalau sudah login)
-- `app/(employee)/` — `/dashboard`, `/riwayat`, `/izin` — butuh session role `EMPLOYEE`
-- `app/(admin)/` — `/admin/dashboard`, `/admin/kehadiran`, `/admin/daftar-pekerja` (data master pekerja + buat akun), `/admin/rekapan-kehadiran` (rekap kehadiran, dulu bernama `/admin/rekapan-karyawan`), `/admin/izin`, `/admin/verifikasi`, `/admin/laporan`, `/admin/lokasi`, `/admin/waktu-kerja`, `/admin/hari-libur` — butuh session role `ADMIN`
-- `app/(account)/` — `/profil` — cukup `requireUser()`, dipakai kedua role
+- `app/(auth)/` — `/login` (redirect ke dashboard sesuai role kalau sudah login). `/request-account` cuma `redirect("/login")`: pendaftaran mandiri ditutup (lihat **Auth**)
+- `app/(employee)/` — `/dashboard`, `/riwayat`, `/izin`, `/lembur`, `/pengaturan` — `requireUser()`, semua role (tab inti mobile-parity; isi desktop-nya tetap untuk `EMPLOYEE`)
+- `app/(admin)/` — `/admin/dashboard`, `/admin/kehadiran`, `/admin/daftar-pekerja` (data master pekerja + buat akun), `/admin/divisi` (Divisi & Jabatan), `/admin/rekapan-kehadiran` (rekap kehadiran, dulu bernama `/admin/rekapan-karyawan`), `/admin/izin`, `/admin/verifikasi`, `/admin/laporan`, `/admin/lokasi`, `/admin/waktu-kerja`, `/admin/hari-libur` — butuh session role `ADMIN`
+- `app/(supervisor)/`, `app/(manager)/` — antrean review (`verifikasi`, `izin`, `lembur`, `dinas-luar`) — `requireRole(SUPERVISOR)` / `requireRole(MANAGER)`
+- `app/(account)/` — `/profil` — cukup `requireUser()`, dipakai semua role
 - `app/action/` — Next.js Server Actions (semua file `"use server"`)
 - `app/api/images/[filename]/` — serve foto absensi dari `uploads/images/` di disk
 - `app/api/laporan/` — download rekap absensi CSV (cek role ADMIN sendiri, balas 403 bukan redirect)
@@ -64,9 +66,11 @@ Uji modul aturan lewat `lib/**/*.test.ts` (`npm test`); aturan yang hidup di DB
 - `lib/date.ts` — semua konversi timezone: `getWorkDate()`, `getMinutesOfDay()`, `parseTimeToMinutes()`, `formatTime()`, `formatWorkDate()`, `workDateTimeToUtc()` (tanggal kerja + "HH:mm" → timestamp UTC, dipakai pencatatan absensi manual admin)
 - `lib/leave.ts` — label & varian badge untuk `LeaveType`/`LeaveStatus` + `countLeaveDays()`
 - `lib/csv.ts` — `toCsv()` (pemisah `;` + BOM UTF-8 supaya rapi di Excel id-ID)
-- `lib/work-schedule.ts` — hari kerja mingguan: `getWorkDayFor()`, `isNonWorkingDate()`,
+- `lib/work-schedule.ts` — Hari Kerja mingguan: `getWorkDayFor()`, `isNonWorkingDate()`,
   `isLateAt()`, `summarizeWeek()`, `orderWeek()`, `DAY_LABEL`. Bebas Prisma supaya bisa dipakai form client juga.
   `isLateAt()` adalah satu-satunya definisi "terlambat" — dipakai absen langsung maupun koreksi.
+  Begitu juga `canStartOvertimeAt()` (Jam Mulai Lembur) dan `autoCheckOutTimeFor()` (tombol
+  "Otomatis" Absen Pulang Terlewat = Jam Pulang hari itu): keduanya per Hari Kerja, bukan jam tetap.
 - `lib/holiday.ts` — hari libur tanggalan: `findHoliday()`, `indexHolidays()`, label & varian badge.
   Bebas Prisma, seperti `work-schedule.ts`.
 - `lib/work-mode.ts` — label, varian badge, dan penjelasan untuk `WorkMode` + `AttendanceApproval`,
@@ -76,7 +80,6 @@ Uji modul aturan lewat `lib/**/*.test.ts` (`npm test`); aturan yang hidup di DB
   (lampiran izin, gambar + PDF). `MAX_SIZE` di sini harus selaras dengan
   `experimental.serverActions.bodySizeLimit` di `next.config.ts`.
 - `lib/division.ts` — struktur organisasi: `buildDivisionTree()`, `isDivisionSupervisor()`, `canHavePosition()`, `normalizePositionId()`.
-- `lib/approval-routing.ts` — aturan routing pengajuan saat review: `canReviewRequest()`, `isTurnToReview()`, `canViewRequest()`, `getApprovalScope()`.
 
 `lib/daily-recap.ts` — `buildDailyRecap()` + `countRecapStatus()`: rekap satu hari
 (satu baris per karyawan aktif), dipakai bersama `/admin/dashboard` dan `/admin/kehadiran`.
@@ -88,8 +91,12 @@ sendiri yang menentukan status `LIBUR` (pola mingguan `WorkDay` + tabel `Holiday
 dan `missingCheckOut` — konsumennya tinggal memakai hasilnya.
 
 **Aturan absensi & rekap** (klasifikasi `RecapStatus`, approval absen luar radius,
-penambahan/koreksi admin, akurasi GPS, absen pulang, absensi menggantung): baca
+penambahan/koreksi admin, akurasi GPS, absen pulang, Absen Pulang Terlewat): baca
 `docs/attendance-rules.md` sebelum menyentuh absensi, rekap, atau approval.
+
+**Divisi & routing approval** (siapa melihat/memutuskan Pengajuan, Dinas luar
+per Divisi, pengisian Jabatan awal): baca `docs/approval-routing.md` sebelum
+menyentuh review, antrean, badge, atau Divisi/Jabatan.
 
 Format tanggal/jam selalu dilakukan di server lalu dikirim ke client sebagai string,
 supaya timezone tidak bergeser mengikuti perangkat karyawan.
@@ -107,10 +114,11 @@ Run `npm run db:generate` after any schema change. Migrations live in `prisma/mi
 
 ### Domain models
 
-- **User** — profil/role aplikasi (`email`, `role` `EMPLOYEE`/`ADMIN`, `isActive`); identitas & password sepenuhnya di Clerk, dihubungkan lewat `clerkId` (unik)
+- **User** — profil/role aplikasi (`email`, `role` `EMPLOYEE`/`SUPERVISOR`/`MANAGER`/`ADMIN`, `isActive`, `positionId` → Jabatan); identitas & password sepenuhnya di Clerk, dihubungkan lewat `clerkId` (unik). Kolom teks `position` disinkronkan `DivisionService` saat Jabatan diset/diganti nama
+- **Division** / **Position** — Divisi dan Jabatan (Jabatan milik tepat satu Divisi); hapus ditolak selama masih berisi
 - **OfficeLocation** — titik kantor (lat/long) + `radiusMeters`; dipakai untuk validasi jarak (haversine)
 - **WorkSchedule** — kebijakan global: `lateToleranceMinutes` (satu baris aktif)
-- **WorkDay** — selalu 7 baris, `dayOfWeek` unik (0 = Minggu … 6 = Sabtu, sama dengan `Date#getUTCDay()`) + `isWorkingDay` + jam masuk/pulang (`"HH:mm"`). Menentukan `isLate` dan hari libur — tidak ada lagi asumsi Sabtu/Minggu di kode
+- **WorkDay** — selalu 7 baris, `dayOfWeek` unik (0 = Minggu … 6 = Sabtu, sama dengan `Date#getUTCDay()`) + `isWorkingDay` + jam masuk/pulang + `overtimeStartTime` (Jam Mulai Lembur, berdiri sendiri — mengubah Jam Pulang tidak ikut mengubahnya; tidak boleh sebelum Jam Pulang), semua `"HH:mm"`. Menentukan `isLate` dan hari libur — tidak ada lagi asumsi Sabtu/Minggu di kode
 - **Attendance** — satu baris per `CHECK_IN`/`CHECK_OUT`; unik per (`userId`, `workDate`, `type`) supaya tidak dobel; simpan foto, koordinat, `distanceMeters`, `isWithinRadius`, `isLate`, `workMode`, `workModeDetail`, `approvalStatus`, `approvedMode`. `photoUrl` / `latitude` / `longitude` / `isWithinRadius` **nullable** — absensi yang dicatat manual (`isManual`) memang tidak punya foto & GPS, jadi jangan perlakukan null sebagai "di luar radius". Jejak admin: `createdByAdminId` (ditambahkan admin), `editedById`/`editedAt`/`originalTimestamp`/`editNote` (jam dikoreksi admin). `Overtime` punya jejak koreksi yang sama (`editedById`, `originalStartAt`, `originalEndAt`, `editNote`)
 - **LeaveRequest** — pengajuan izin/sakit/cuti; status `PENDING` → `APPROVED`/`REJECTED` beserta `reviewedBy` / `reviewedAt` / `reviewNote`. Satu-satunya jalur untuk `SAKIT`/`IZIN`/`CUTI`
 - **Holiday** — tanggal merah, cuti bersama, dan libur internal (`date` unik). Melengkapi `WorkDay` yang hanya mengatur pola mingguan
@@ -118,9 +126,10 @@ Run `npm run db:generate` after any schema change. Migrations live in `prisma/mi
 `servers/services/notification.service.ts` menghitung angka merah di sidebar
 (`NotificationService.forUser()`), dipanggil sekali di `DashboardShell` supaya
 ketiga layout tidak menghitungnya sendiri-sendiri. Isinya sengaja hanya hal yang
-perlu ditindak orang yang sedang login: antrean Admin (semua antrean), Supervisor
-(izin & lembur anggota divisi yang dipimpin), dan Manager (seluruh organisasi +
-divisi yatim). Karyawan tidak punya antrean review, jadi badge-nya kosong.
+perlu ditindak orang yang sedang login, dengan cakupan routing yang sama:
+Admin (semua antrean), Supervisor Divisi (Pengajuan anggota Divisinya), dan
+Manager (tahap MANAGER + Divisi tanpa Supervisor Divisi aktif). Karyawan tidak
+punya antrean review, jadi badge-nya kosong.
 
 `workDate`, `startDate`, dan `endDate` disimpan sebagai kolom `date` (tanpa jam) dan dihitung
 memakai timezone `APP_TIMEZONE` (default `Asia/Jakarta`).
@@ -131,6 +140,11 @@ Clerk (email + password only — sign-up dimatikan di Clerk Dashboard, akun kary
 cuma bisa dibuat admin lewat `/admin/daftar-pekerja/baru`). Prisma `User` tidak
 menyimpan password sama sekali; identitas & kredensial sepenuhnya di Clerk,
 dihubungkan lewat `User.clerkId`.
+
+Pendaftaran mandiri ditutup: `POST /api/account-requests` membalas 410, dan
+halaman login (desktop & mobile web) menampilkan `ContactAdminDialog` (teks &
+`mailto:` di `lib/contact-admin.ts`). `/admin/permintaan-akun` hanya tersisa
+untuk menuntaskan `AccountRequest` lama yang masih `PENDING`.
 
 ```
 proxy.ts         ← clerkMiddleware: cuma jamin sudah login, redirect ke /login kalau belum
@@ -145,7 +159,9 @@ app/action/user.action.ts            ← createEmployee/updateEmployee/setEmploy
                                         supaya akun Clerk & baris Prisma selalu sinkron
 ```
 
-Layout `(employee)` dan `(admin)` memanggil `requireRole()`, jadi user yang dinonaktifkan
+Layout `(admin)`/`(supervisor)`/`(manager)` memanggil `requireRole()` dan
+`(employee)`/`(account)` memanggil `requireUser()`; keduanya mengecek `isActive`, jadi
+user yang dinonaktifkan
 (di-ban di Clerk **dan** `isActive=false` di Prisma) langsung kehilangan akses walau
 sesi Clerk-nya masih valid. Ganti password dilakukan client-side lewat
 `user.updatePassword()` (Clerk memverifikasi password lama sendiri) — tidak ada
