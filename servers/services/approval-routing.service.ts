@@ -15,6 +15,11 @@ import {
   type RoutingReviewer,
   type RoutingTarget,
 } from "@/lib/approval-routing";
+import {
+  canReviewAttendance,
+  ownerRolesForAttendanceReviewer,
+  resolveAttendanceReviewerRole,
+} from "@/lib/attendance";
 
 /**
  * Filter Prisma untuk pengajuan izin pending sesuai cakupan reviewer.
@@ -92,6 +97,59 @@ export function buildOvertimeWhereForScope(
           {
             stage: OvertimeStage.SUPERVISOR,
             user: {
+              jobPosition: { divisionId: { in: scope.orphanDivisionIds } },
+            },
+          },
+        ],
+      };
+  }
+}
+
+/**
+ * Filter Prisma untuk absen luar radius pending sesuai cakupan reviewer.
+ * `Attendance` tidak punya kolom tahap: tahapnya diturunkan dari Role pemilik
+ * (`ownerRolesForAttendanceReviewer`) — karyawan/admin di tahap SUPERVISOR,
+ * supervisor di tahap MANAGER. Cakupan Divisi ditumpuk di atasnya.
+ */
+export function buildAttendanceWhereForScope(
+  scope: ApprovalScope,
+): Prisma.AttendanceWhereInput {
+  const supervisorStage = { in: ownerRolesForAttendanceReviewer(Role.SUPERVISOR) };
+  const managerStage = { in: ownerRolesForAttendanceReviewer(Role.MANAGER) };
+
+  switch (scope.kind) {
+    case "none":
+      return { id: "__none__" };
+    case "all":
+      return {
+        approvalStatus: AttendanceApproval.PENDING,
+        user: { role: supervisorStage },
+      };
+    case "division":
+      return {
+        approvalStatus: AttendanceApproval.PENDING,
+        user: {
+          role: supervisorStage,
+          OR: [
+            { jobPosition: { divisionId: scope.divisionId } },
+            { positionId: null },
+          ],
+        },
+      };
+    case "manager":
+      if (scope.orphanDivisionIds.length === 0) {
+        return {
+          approvalStatus: AttendanceApproval.PENDING,
+          user: { role: managerStage },
+        };
+      }
+      return {
+        approvalStatus: AttendanceApproval.PENDING,
+        OR: [
+          { user: { role: managerStage } },
+          {
+            user: {
+              role: supervisorStage,
               jobPosition: { divisionId: { in: scope.orphanDivisionIds } },
             },
           },
@@ -322,6 +380,48 @@ export const ApprovalRoutingService = {
         requesterDivisionId: overtime.user.jobPosition?.divisionId ?? null,
         requesterPositionId: overtime.user.positionId,
         stage: overtime.stage,
+      },
+    });
+  },
+
+  /**
+   * Cek apakah reviewer berhak memutuskan absen luar radius. Tahap diturunkan
+   * dari Role pemilik (`resolveAttendanceReviewerRole`), lalu modul routing
+   * memutuskan — termasuk Manager yang mengambil tahap SUPERVISOR milik Divisi
+   * tanpa Supervisor Divisi aktif. ADMIN tetap boleh memutuskan absensi siapa
+   * pun selain miliknya sendiri (`canReviewAttendance`).
+   */
+  async canReviewAttendance(
+    reviewer: { id: string; role: Role; positionId?: string | null },
+    attendance: {
+      user: {
+        id: string;
+        role: Role;
+        positionId?: string | null;
+        jobPosition?: { divisionId?: string | null } | null;
+      };
+    },
+  ): Promise<boolean> {
+    const owner = attendance.user;
+
+    if (reviewer.id === owner.id) return false;
+    if (reviewer.role === Role.ADMIN) return canReviewAttendance(reviewer, owner);
+
+    const stage = resolveAttendanceReviewerRole(owner.role);
+    if (!stage) return false;
+
+    return this.canReview({
+      reviewer,
+      target: {
+        requesterRole: owner.role,
+        // Tanpa `jobPosition` di-include, biarkan `canReview` membaca Divisi
+        // dari `positionId` — jangan anggap pemilik tanpa Jabatan.
+        requesterDivisionId:
+          owner.jobPosition === undefined
+            ? undefined
+            : (owner.jobPosition?.divisionId ?? null),
+        requesterPositionId: owner.positionId,
+        stage,
       },
     });
   },

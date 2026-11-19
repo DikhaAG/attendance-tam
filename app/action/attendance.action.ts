@@ -31,12 +31,11 @@ import {
 import { WORK_MODE_LABEL, isLateEligible } from "@/lib/work-mode";
 import {
   ATTENDANCE_TYPE_LABEL,
-  canReviewAttendance,
   effectiveWorkMode,
-  ownerRolesForAttendanceReviewer,
   resolveAttendanceReviewerRole,
 } from "@/lib/attendance";
 import { AttendanceService } from "@/servers/services/attendance.service";
+import { ApprovalRoutingService } from "@/servers/services/approval-routing.service";
 import {
   OfficeLocationService,
   WorkDayService,
@@ -495,10 +494,10 @@ export async function submitAttendance(
  * yang diklaim karyawan) atau tolak. Absensi yang ditolak dianulir — hari itu
  * dihitung Alfa, tapi barisnya tetap tersimpan sebagai jejak.
  *
- * Reviewer yang berhak ditentukan dari role pemilik absensi (lihat
- * `canReviewAttendance` di lib/attendance.ts) — karyawan/admin direview
- * SUPERVISOR, supervisor direview MANAGER, dan ADMIN boleh memutuskan yang mana
- * pun selain absensinya sendiri.
+ * Reviewer yang berhak: tahap dari role pemilik absensi (karyawan/admin →
+ * SUPERVISOR, supervisor → MANAGER) dengan cakupan Divisi di atasnya (lihat
+ * `ApprovalRoutingService.canReviewAttendance`, ADR 0002). ADMIN boleh
+ * memutuskan yang mana pun selain absensinya sendiri.
  */
 export async function reviewAttendance(
   attendanceId: string,
@@ -521,7 +520,7 @@ export async function reviewAttendance(
     return { ok: false, error: "Absensi tidak ditemukan" };
   }
 
-  if (!canReviewAttendance(reviewer, attendance.user)) {
+  if (!(await ApprovalRoutingService.canReviewAttendance(reviewer, attendance))) {
     return { ok: false, error: "Kamu tidak berhak memutuskan absensi ini" };
   }
 
@@ -580,7 +579,8 @@ export async function reviewAttendance(
 
 /**
  * Setujui sekaligus semua absensi luar radius yang jadi giliran reviewer yang
- * login (`ownerRolesForAttendanceReviewer`), sesuai klaim karyawan — tanpa
+ * login (cakupan Divisi dari `ApprovalRoutingService.getScopeForReviewer`;
+ * ADMIN: semua), sesuai klaim karyawan — tanpa
  * menimpa mode. Yang butuh penilaian lain (mis. diubah jadi sakit) tetap
  * lewat `reviewAttendance` satu per satu.
  */
@@ -591,8 +591,13 @@ export async function approveAllPendingAttendance(): Promise<ReviewAttendanceRes
     Role.MANAGER,
   ]);
 
+  const scope =
+    reviewer.role === Role.ADMIN
+      ? undefined
+      : await ApprovalRoutingService.getScopeForReviewer(reviewer);
+
   const approved = await AttendanceService.approveAllPending({
-    ownerRoles: ownerRolesForAttendanceReviewer(reviewer.role),
+    scope,
     excludeUserId: reviewer.id,
     reviewedById: reviewer.id,
     reviewNote: "Disetujui massal",

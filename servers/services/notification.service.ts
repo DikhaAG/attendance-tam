@@ -1,5 +1,4 @@
 import { Role, type User } from "@/generated/prisma";
-import { ownerRolesForAttendanceReviewer } from "@/lib/attendance";
 import { AccountRequestService } from "./account-request.service";
 import { AttendanceService } from "./attendance.service";
 import { ApprovalRoutingService } from "./approval-routing.service";
@@ -46,15 +45,13 @@ export const NotificationService = {
     };
   },
 
-  /** Antrean supervisor: izin + lembur + verifikasi absensi di giliran supervisor. */
+  /** Antrean supervisor: izin + lembur + verifikasi absensi di giliran supervisor, sesuai cakupan Divisinya. */
   async forSupervisor(user: User): Promise<SidebarBadges> {
     const scope = await ApprovalRoutingService.getScopeForReviewer(user);
     const [leaves, overtimes, attendanceApprovals] = await Promise.all([
       LeaveService.countPending(scope),
       OvertimeService.countPending(scope),
-      AttendanceService.countPendingApprovalForOwnerRoles(
-        ownerRolesForAttendanceReviewer(Role.SUPERVISOR),
-      ),
+      AttendanceService.countPendingApprovalForScope(scope),
     ]);
 
     return {
@@ -64,7 +61,7 @@ export const NotificationService = {
     };
   },
 
-  /** Antrean manager: izin + lembur + dinas luar + verifikasi absensi milik supervisor. */
+  /** Antrean manager: izin + lembur + dinas luar + verifikasi absensi milik supervisor dan Divisi tanpa Supervisor Divisi aktif. */
   async forManager(user: User): Promise<SidebarBadges> {
     const scope = await ApprovalRoutingService.getScopeForReviewer(user);
     const [leaves, overtimes, fieldAssignments, attendanceApprovals] =
@@ -72,9 +69,7 @@ export const NotificationService = {
         LeaveService.countPending(scope),
         OvertimeService.countPending(scope),
         FieldAssignmentService.countPending(),
-        AttendanceService.countPendingApprovalForOwnerRoles(
-          ownerRolesForAttendanceReviewer(Role.MANAGER),
-        ),
+        AttendanceService.countPendingApprovalForScope(scope),
       ]);
 
     return {
