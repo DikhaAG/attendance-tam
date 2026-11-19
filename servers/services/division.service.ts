@@ -1,10 +1,14 @@
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma";
 import type { PositionGroup } from "@/lib/division";
 import type {
   AssignPositionDTO,
   DivisionDTO,
   PositionDTO,
 } from "../validators/division.validator";
+
+/** Klien Prisma atau transaksi pemanggil (skrip pemetaan Divisi, tiket 14). */
+type Db = Prisma.TransactionClient;
 
 /** Hasil hapus yang ditolak karena masih ada isinya. */
 export type DeleteOutcome =
@@ -68,8 +72,8 @@ export const DivisionService = {
     });
   },
 
-  async createDivision(data: DivisionDTO) {
-    return prisma.division.create({ data: { name: data.name } });
+  async createDivision(data: DivisionDTO, db: Db = prisma) {
+    return db.division.create({ data: { name: data.name } });
   },
 
   async renameDivision(id: string, data: DivisionDTO) {
@@ -87,8 +91,8 @@ export const DivisionService = {
     });
   },
 
-  async createPosition(data: PositionDTO) {
-    return prisma.position.create({
+  async createPosition(data: PositionDTO, db: Db = prisma) {
+    return db.position.create({
       data: { name: data.name, divisionId: data.divisionId },
     });
   },
@@ -121,17 +125,18 @@ export const DivisionService = {
 
   /**
    * Set Jabatan seseorang langsung, tanpa approval. `positionId` null
-   * mengosongkan Jabatan dan membiarkan kolom teks apa adanya.
+   * mengosongkan Jabatan dan membiarkan kolom teks apa adanya. Dengan `db`
+   * (transaksi pemanggil), ditulis di transaksi itu.
    */
-  async assignPosition({ userId, positionId }: AssignPositionDTO) {
+  async assignPosition({ userId, positionId }: AssignPositionDTO, db?: Db) {
     if (positionId === null) {
-      return prisma.user.update({
+      return (db ?? prisma).user.update({
         where: { id: userId },
         data: { positionId: null },
       });
     }
 
-    return prisma.$transaction(async (tx) => {
+    const write = async (tx: Db) => {
       const position = await tx.position.findUniqueOrThrow({
         where: { id: positionId },
         select: { name: true },
@@ -140,6 +145,8 @@ export const DivisionService = {
         where: { id: userId },
         data: { positionId, position: position.name },
       });
-    });
+    };
+
+    return db ? write(db) : prisma.$transaction(write);
   },
 };

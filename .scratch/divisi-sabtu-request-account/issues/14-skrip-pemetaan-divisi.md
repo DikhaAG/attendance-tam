@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: ready-for-human
 Repo: attendance-tam
 Blocked by: 09
 
@@ -43,7 +43,7 @@ dugaan.
 
 ## Kriteria selesai
 
-- [ ] `--apply` dua kali: kali kedua tidak mengubah apa pun.
+- [x] `--apply` dua kali: kali kedua tidak mengubah apa pun.
 
 ## Langkah manusia
 
@@ -64,3 +64,43 @@ Alurnya dipandu `scripts/wizard-skrip-produksi.sh`.
   pakai `MigrationService.checkApplied()` (sudah menolak database kosong).
 - Output dry-run cukup menampilkan nama + Jabatan; email hanya dipakai untuk
   pencocokan, tidak perlu dicetak.
+
+## Comments
+
+**2026-11-19** — Diimplementasikan: `lib/division-mapping.ts` (struktur,
+baca file pemetaan, rencana — bebas Prisma),
+`servers/services/division-mapping.service.ts` (baca/tulis DB, satu transaksi,
+cek migrasi `20261118020000_division_position`), `scripts/pemetaan-divisi.ts`
+(CLI). Jalankan: `npx tsx scripts/pemetaan-divisi.ts FILE` (dry-run) lalu
+`… FILE --apply`. Contoh format rekaan: `scripts/pemetaan-divisi.example.csv`;
+`pemetaan-divisi*.csv` / `pemetaan-divisi*.json` diabaikan git.
+
+Keputusan implementasi:
+- File pemetaan menyebut orang yang bernama di daftar (id + email). User aktif
+  berteks jabatan persis "Teknisi" yang **tidak** disebut file otomatis jadi
+  Teknisi; kalau disebut (mis. Hery → Teknisi (EoS)), file menang.
+- Dugaan Role per Jabatan dikunci di `DIVISION_STRUCTURE`: Supervisor Admin /
+  Supervisor Teknis → `SUPERVISOR`; Admin → `EMPLOYEE` atau `ADMIN` (Sopiah);
+  Teknisi, Teknisi (EoS), Programmer → `EMPLOYEE`. Selain itu berhenti (juga
+  untuk Manager & user hasil aturan teks "Teknisi").
+- Berhenti juga kalau baris file dobel, Jabatan tidak dikenal, atau akun
+  nonaktif disebut. Semua ketidakcocokan dilaporkan sekaligus.
+- Dry-run mencetak nama → Jabatan → Divisi (tanpa email), yang dilewati, dan
+  "Tetap tanpa Jabatan" (aktif, bukan Manager) untuk dicocokkan dengan daftar
+  tidak dipetakan.
+- `DivisionService.createDivision/createPosition/assignPosition` kini menerima
+  transaksi pemanggil (opsional), supaya skrip memakai jalur set-Jabatan tiket
+  09 (kolom teks ikut tersinkron) di satu transaksi.
+- `scripts/wizard-skrip-produksi.sh` menanyakan path file pemetaan saat skrip
+  ini dipilih dan meneruskannya ke setiap jalan skrip.
+
+Terverifikasi: `npm run check` hijau. Integration test: dry-run tidak menulis;
+apply membuat 2 Divisi + 6 Jabatan dan memetakan 8 user (teks jabatan
+tersinkron; nonaktif, Administrator, Manager tidak tersentuh); apply kedua 0
+perubahan (snapshot termasuk `updatedAt` identik); email salah / Role salah /
+Jabatan berbeda → berhenti tanpa menulis. Smoke test CLI di DB sementara dengan
+user rekaan: dry-run → apply (6 dipetakan) → apply kedua (0, 6 dilewati).
+
+**Belum (langkah manusia):** file pemetaan asli belum disusun (butuh snapshot
+`User` produksi); dry-run/apply ke salinan produksi dan cek `/admin/divisi`
+belum dilakukan.

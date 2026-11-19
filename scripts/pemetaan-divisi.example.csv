@@ -1,0 +1,9 @@
+# Contoh format dengan data REKAAN. File asli (dari snapshot User produksi)
+# beri nama pemetaan-divisi.csv / pemetaan-divisi.produksi.csv — diabaikan git.
+# User aktif berteks jabatan persis "Teknisi" tidak perlu ditulis: otomatis Teknisi.
+userId,email,jabatan
+cm0contohsupervisoradmin,supervisor.admin@contoh.test,Supervisor Admin
+cm0contohadmin1,admin.satu@contoh.test,Admin
+cm0contohsupervisorteknis,supervisor.teknis@contoh.test,Supervisor Teknis
+cm0contohteknisieos,teknisi.eos@contoh.test,Teknisi (EoS)
+cm0contohprogrammer,programmer@contoh.test,Programmer

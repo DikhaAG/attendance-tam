@@ -211,6 +211,7 @@ PROD_DATABASE_URL=""
 BACKUP_FILE=""
 COPY_DB=""
 SCRIPT_PATH=""
+MAPPING_FILE=""   # khusus scripts/pemetaan-divisi.ts
 
 # db_label URL → "host/nama_db" tanpa user & password.
 db_label() { node -e 'const u=new URL(process.argv[1]); console.log(u.host + u.pathname)' "$1"; }
@@ -218,7 +219,7 @@ db_label() { node -e 'const u=new URL(process.argv[1]); console.log(u.host + u.p
 run_script() { # run_script URL [--apply]
   local url="$1"; shift
   printf '\n'
-  DATABASE_URL="$url" npx tsx "$SCRIPT_PATH" "$@"
+  DATABASE_URL="$url" npx tsx "$SCRIPT_PATH" ${MAPPING_FILE:+"$MAPPING_FILE"} "$@"
 }
 
 banner "Skrip data sekali jalan ke produksi"
@@ -236,6 +237,16 @@ if [[ ! -f "$SCRIPT_PATH" ]]; then
   warn "File $SCRIPT_PATH tidak ada."; exit 1
 fi
 printf '  %s✓%s %s\n' "$GREEN" "$RESET" "$SCRIPT_PATH"
+if [[ "$SCRIPT_PATH" == *pemetaan-divisi.ts ]]; then
+  say "Skrip ini butuh file pemetaan lokal (userId,email,jabatan) dari snapshot User"
+  say "produksi. Format: scripts/pemetaan-divisi.example.csv. Jangan di-commit."
+  ask MAPPING_FILE "Path file pemetaan (.csv/.json):"
+  MAPPING_FILE="${MAPPING_FILE/#\~/$HOME}"
+  if [[ ! -f "$MAPPING_FILE" ]]; then
+    warn "File $MAPPING_FILE tidak ada."; exit 1
+  fi
+  printf '  %s✓%s %s\n' "$GREEN" "$RESET" "$MAPPING_FILE"
+fi
 pause
 
 # ── 2 ─────────────────────────────────────────────────────────────────────
