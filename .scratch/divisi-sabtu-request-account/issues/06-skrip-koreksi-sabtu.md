@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: ready-for-human
 Repo: attendance-tam
 Blocked by: 04
 
@@ -31,12 +31,43 @@ kalau Jam Pulang Sabtu di `WorkDay` bukan hari kerja.
 - [ ] Dry-run ke salinan DB lokal (restore backup produksi) melaporkan
       **47 baris**; dua anomali (pulang 05:00 & 07:01) dan 12 baris 14:00
       **tidak** tersentuh.
-- [ ] Menjalankan `--apply` dua kali: kali kedua 0 baris.
+- [x] Menjalankan `--apply` dua kali: kali kedua 0 baris.
 - [ ] Setelah apply, baris tampil berlabel "Diubah admin" di halaman
       kehadiran admin dengan jam asli terlihat.
-- [ ] Ada petunjuk singkat di header skrip: backup dulu, dry-run dulu.
+- [x] Ada petunjuk singkat di header skrip: backup dulu, dry-run dulu.
 
 ## Catatan
 
 - Agent **tidak** menjalankan `--apply` ke produksi — itu langkah manusia.
 - Jalankan setelah tiket 04 dirilis, supaya tidak muncul baris salah baru.
+
+## Comments
+
+**2026-11-19** — Diimplementasikan: `lib/saturday-correction.ts` (aturan sasaran
++ rencana, bebas Prisma), `servers/services/saturday-correction.service.ts`
+(baca/tulis DB, satu transaksi), `scripts/koreksi-sabtu.ts` (CLI). Jalankan:
+`npx tsx scripts/koreksi-sabtu.ts` (dry-run) lalu `… --apply`.
+
+Pengaman tambahan dari pola "Skrip sekali jalan" di spec, di luar daftar tiket:
+- cek `_prisma_migrations` memuat `20261118020000_division_position` — migrasi
+  pertama sesudah commit tiket 04, jadi kode yang berjalan sudah tidak membuat
+  baris 17:00 baru;
+- berhenti kalau Jam Pulang Sabtu di `WorkDay` bukan 14:00 (bukan hanya kalau
+  Sabtu libur), atau akun Administrator nonaktif;
+- **baris konflik**: absen pulang 17:00 yang absen masuknya tidak sebelum 14:00
+  akan jadi pulang sebelum masuk. Dry-run menampilkannya di tabel terpisah;
+  `--apply` menolak jalan sampai baris itu dikoreksi lewat dialog Edit (lalu
+  tidak lagi jadi sasaran karena `editedAt` terisi).
+
+Terverifikasi: `npm run check` hijau. Integration test meniru produksi (47
+sasaran, anomali 05:00 & 07:01, 12 baris 14:00, 17:00 hari Jumat → 47 terkoreksi,
+sisanya utuh; apply kedua 0). Smoke test skrip di DB sementara: migrasi hilang →
+berhenti, konflik → apply ditolak, sesudah Edit → apply 2, apply kedua 0.
+
+**Belum (langkah manusia):** DB lokal kosong, tidak ada backup produksi yang
+di-restore — jadi dry-run 47 baris ke salinan produksi dan cek label "Diubah
+admin" di `/admin/kehadiran` belum dilakukan. Label berasal dari
+`editedById !== null` (`lib/attendance.ts`), yang diisi skrip. Kalau dry-run
+menampilkan konflik, jumlah sasaran = 47 − konflik. `--apply` ke produksi tetap
+langkah manusia.
+
