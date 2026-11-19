@@ -1,5 +1,5 @@
-import prisma from "@/lib/prisma";
-import { AttendanceType, Prisma, Role } from "@/generated/prisma";
+import prisma, { type Db } from "@/lib/prisma";
+import { AttendanceType, Role } from "@/generated/prisma";
 import {
   isSaturdayAutoCheckOut,
   planSaturdayCorrection,
@@ -24,7 +24,6 @@ export const SATURDAY_CORRECTOR_EMAIL = "admin@tarunagroup.co.id";
  */
 export const REQUIRED_MIGRATION = "20261118020000_division_position";
 
-type Db = Prisma.TransactionClient;
 type Failure = { ok: false; error: string };
 
 async function findCorrector(db: Db) {

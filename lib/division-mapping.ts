@@ -39,8 +39,8 @@ export const DIVISION_STRUCTURE: readonly {
   },
 ];
 
-/** Satu baris file pemetaan. */
-export type MappingEntry = { userId: string; email: string; jabatan: string };
+/** Satu baris file pemetaan. `line` = nomor baris file (CSV) atau urutan objek (JSON). */
+export type MappingEntry = { userId: string; email: string; jabatan: string; line?: number };
 
 export type MappingUser = {
   id: string;
@@ -83,8 +83,9 @@ export type MappingPlan =
   | { ok: false; errors: string[] };
 
 /**
- * Teks jabatan lama yang otomatis dipetakan ke Jabatan bernama sama, untuk
- * semua user aktif yang tidak disebut file (cocok persis, peka huruf besar).
+ * Teks jabatan lama yang harus muncul di file pemetaan: user aktif berteks
+ * persis ini (peka huruf besar) yang tidak disebut file berarti snapshot sudah
+ * usang → berhenti. Teks ini hanya pemeriksa; pemetaan tetap dari file (id + email).
  */
 export const TEKNISI_TEXT = "Teknisi";
 
@@ -127,7 +128,7 @@ function toEntries(rows: RawRow[]): ParsedMapping {
     if (!userId || !email || !jabatan) {
       errors.push(`Baris ${line}: userId, email, dan jabatan wajib diisi.`);
     } else {
-      entries.push({ userId, email, jabatan });
+      entries.push({ userId, email, jabatan, line });
     }
   }
 
@@ -208,17 +209,13 @@ export function planDivisionMapping(input: MappingInput): MappingPlan {
   const assignments: MappingAssignment[] = [];
   const skipped: MappingAssignment[] = [];
 
-  const listed = new Set(input.entries.map((entry) => entry.userId));
-  const byTeknisiText = input.users
-    .filter((user) => user.isActive && user.position === TEKNISI_TEXT && !listed.has(user.id))
-    .map((user) => ({ userId: user.id, email: user.email, jabatan: TEKNISI_TEXT }));
-
   const seen = new Set<string>();
 
-  for (const entry of [...input.entries, ...byTeknisiText]) {
+  for (const entry of input.entries) {
     const target = usersById.get(entry.userId);
     const structure = STRUCTURE_POSITIONS.find((p) => p.name === entry.jabatan);
-    const row = `Baris ${entry.userId}`;
+    // Nomor baris file kalau ada (dari `parseDivisionMapping`), kalau tidak id user-nya.
+    const row = entry.line === undefined ? `User ${entry.userId}` : `Baris ${entry.line}`;
 
     if (seen.has(entry.userId)) {
       errors.push(`${row}: user disebut lebih dari sekali di file.`);
@@ -266,6 +263,15 @@ export function planDivisionMapping(input: MappingInput): MappingPlan {
     } else {
       errors.push(
         `${who} sudah memegang Jabatan lain (${describePosition(input, target.positionId)}), bukan ${structure.name}.`,
+      );
+    }
+  }
+
+  const listed = new Set(input.entries.map((entry) => entry.userId));
+  for (const user of input.users) {
+    if (user.isActive && user.position === TEKNISI_TEXT && !listed.has(user.id)) {
+      errors.push(
+        `${user.name} (${user.id}) aktif berteks jabatan "${TEKNISI_TEXT}" tapi tidak ada di file pemetaan — snapshot sudah usang? Tambahkan ke file.`,
       );
     }
   }

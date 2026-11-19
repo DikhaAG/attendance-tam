@@ -16,10 +16,65 @@ import {
   type RoutingTarget,
 } from "@/lib/approval-routing";
 import {
-  canReviewAttendance,
   ownerRolesForAttendanceReviewer,
   resolveAttendanceReviewerRole,
 } from "@/lib/attendance";
+
+/**
+ * Potongan filter per jenis Pengajuan yang dirakit `buildWhereForScope`.
+ * `W` = `Prisma.<Model>WhereInput` milik jenis itu.
+ */
+type ScopeWhereParts<W> = {
+  /** Masih menunggu keputusan. */
+  pending: W;
+  /** Tahap MANAGER. */
+  managerStage: W;
+  /** Tahap SUPERVISOR, opsional disaring ke pemohon yang cocok `requester`. */
+  supervisorStage: (requester?: Prisma.UserWhereInput) => W;
+  /** Saring ke pemohon yang cocok `requester`. */
+  requester: (requester: Prisma.UserWhereInput) => W;
+};
+
+/**
+ * Satu-satunya terjemahan `ApprovalScope` → filter Prisma (lihat tabel di
+ * `docs/approval-routing.md`); izin, lembur, dan absen luar radius hanya
+ * berbeda di potongan per tahapnya.
+ */
+function buildWhereForScope<W extends object>(
+  scope: ApprovalScope,
+  parts: ScopeWhereParts<W>,
+): W {
+  switch (scope.kind) {
+    case "none":
+      return { id: "__none__" } as W;
+    case "all":
+      return { ...parts.pending, ...parts.supervisorStage() };
+    case "division":
+      return {
+        ...parts.pending,
+        ...parts.supervisorStage(),
+        OR: [
+          parts.requester({ jobPosition: { divisionId: scope.divisionId } }),
+          parts.requester({ positionId: null }),
+        ],
+      };
+    case "manager":
+      if (scope.orphanDivisionIds.length === 0) {
+        return { ...parts.pending, ...parts.managerStage };
+      }
+      return {
+        ...parts.pending,
+        OR: [
+          parts.managerStage,
+          parts.supervisorStage({
+            jobPosition: { divisionId: { in: scope.orphanDivisionIds } },
+          }),
+        ],
+      };
+  }
+}
+
+const byRequester = (requester: Prisma.UserWhereInput) => ({ user: requester });
 
 /**
  * Filter Prisma untuk pengajuan izin pending sesuai cakupan reviewer.
@@ -27,37 +82,15 @@ import {
 export function buildLeaveWhereForScope(
   scope: ApprovalScope,
 ): Prisma.LeaveRequestWhereInput {
-  switch (scope.kind) {
-    case "none":
-      return { id: "__none__" };
-    case "all":
-      return { status: LeaveStatus.PENDING, stage: LeaveStage.SUPERVISOR };
-    case "division":
-      return {
-        status: LeaveStatus.PENDING,
-        stage: LeaveStage.SUPERVISOR,
-        OR: [
-          { user: { jobPosition: { divisionId: scope.divisionId } } },
-          { user: { positionId: null } },
-        ],
-      };
-    case "manager":
-      if (scope.orphanDivisionIds.length === 0) {
-        return { status: LeaveStatus.PENDING, stage: LeaveStage.MANAGER };
-      }
-      return {
-        status: LeaveStatus.PENDING,
-        OR: [
-          { stage: LeaveStage.MANAGER },
-          {
-            stage: LeaveStage.SUPERVISOR,
-            user: {
-              jobPosition: { divisionId: { in: scope.orphanDivisionIds } },
-            },
-          },
-        ],
-      };
-  }
+  return buildWhereForScope<Prisma.LeaveRequestWhereInput>(scope, {
+    pending: { status: LeaveStatus.PENDING },
+    managerStage: { stage: LeaveStage.MANAGER },
+    supervisorStage: (requester) => ({
+      stage: LeaveStage.SUPERVISOR,
+      ...(requester && { user: requester }),
+    }),
+    requester: byRequester,
+  });
 }
 
 /**
@@ -66,44 +99,23 @@ export function buildLeaveWhereForScope(
 export function buildOvertimeWhereForScope(
   scope: ApprovalScope,
 ): Prisma.OvertimeWhereInput {
-  switch (scope.kind) {
-    case "none":
-      return { id: "__none__" };
-    case "all":
-      return {
-        status: AttendanceApproval.PENDING,
-        stage: OvertimeStage.SUPERVISOR,
-      };
-    case "division":
-      return {
-        status: AttendanceApproval.PENDING,
-        stage: OvertimeStage.SUPERVISOR,
-        OR: [
-          { user: { jobPosition: { divisionId: scope.divisionId } } },
-          { user: { positionId: null } },
-        ],
-      };
-    case "manager":
-      if (scope.orphanDivisionIds.length === 0) {
-        return {
-          status: AttendanceApproval.PENDING,
-          stage: OvertimeStage.MANAGER,
-        };
-      }
-      return {
-        status: AttendanceApproval.PENDING,
-        OR: [
-          { stage: OvertimeStage.MANAGER },
-          {
-            stage: OvertimeStage.SUPERVISOR,
-            user: {
-              jobPosition: { divisionId: { in: scope.orphanDivisionIds } },
-            },
-          },
-        ],
-      };
-  }
+  return buildWhereForScope<Prisma.OvertimeWhereInput>(scope, {
+    pending: { status: AttendanceApproval.PENDING },
+    managerStage: { stage: OvertimeStage.MANAGER },
+    supervisorStage: (requester) => ({
+      stage: OvertimeStage.SUPERVISOR,
+      ...(requester && { user: requester }),
+    }),
+    requester: byRequester,
+  });
 }
+
+/**
+ * Cakupan antrean absen luar radius: cakupan routing biasa, plus `admin` —
+ * Admin memutuskan absensi Role mana pun (kecuali miliknya sendiri, disaring
+ * pemanggil lewat `excludeUserId`). Dibuat `getAttendanceScopeForReviewer()`.
+ */
+export type AttendanceScope = ApprovalScope | { kind: "admin" };
 
 /**
  * Filter Prisma untuk absen luar radius pending sesuai cakupan reviewer.
@@ -112,50 +124,25 @@ export function buildOvertimeWhereForScope(
  * supervisor di tahap MANAGER. Cakupan Divisi ditumpuk di atasnya.
  */
 export function buildAttendanceWhereForScope(
-  scope: ApprovalScope,
+  scope: AttendanceScope,
 ): Prisma.AttendanceWhereInput {
-  const supervisorStage = { in: ownerRolesForAttendanceReviewer(Role.SUPERVISOR) };
-  const managerStage = { in: ownerRolesForAttendanceReviewer(Role.MANAGER) };
+  const pending = { approvalStatus: AttendanceApproval.PENDING };
 
-  switch (scope.kind) {
-    case "none":
-      return { id: "__none__" };
-    case "all":
-      return {
-        approvalStatus: AttendanceApproval.PENDING,
-        user: { role: supervisorStage },
-      };
-    case "division":
-      return {
-        approvalStatus: AttendanceApproval.PENDING,
-        user: {
-          role: supervisorStage,
-          OR: [
-            { jobPosition: { divisionId: scope.divisionId } },
-            { positionId: null },
-          ],
-        },
-      };
-    case "manager":
-      if (scope.orphanDivisionIds.length === 0) {
-        return {
-          approvalStatus: AttendanceApproval.PENDING,
-          user: { role: managerStage },
-        };
-      }
-      return {
-        approvalStatus: AttendanceApproval.PENDING,
-        OR: [
-          { user: { role: managerStage } },
-          {
-            user: {
-              role: supervisorStage,
-              jobPosition: { divisionId: { in: scope.orphanDivisionIds } },
-            },
-          },
-        ],
-      };
-  }
+  if (scope.kind === "admin") return pending;
+
+  return buildWhereForScope<Prisma.AttendanceWhereInput>(scope, {
+    pending,
+    managerStage: {
+      user: { role: { in: ownerRolesForAttendanceReviewer(Role.MANAGER) } },
+    },
+    supervisorStage: (requester) => ({
+      user: {
+        role: { in: ownerRolesForAttendanceReviewer(Role.SUPERVISOR) },
+        ...requester,
+      },
+    }),
+    requester: byRequester,
+  });
 }
 
 /**
@@ -282,6 +269,20 @@ export const ApprovalRoutingService = {
   },
 
   /**
+   * Cakupan antrean absen luar radius untuk reviewer: ADMIN → `admin` (semua
+   * Role), selain itu cakupan routing biasa. Satu-satunya tempat aturan
+   * "Admin memutuskan absensi siapa pun" untuk antrean.
+   */
+  async getAttendanceScopeForReviewer(user: {
+    id?: string;
+    role: Role | string;
+    positionId?: string | null;
+  }): Promise<AttendanceScope> {
+    if (user.role === Role.ADMIN) return { kind: "admin" };
+    return this.getScopeForReviewer(user);
+  },
+
+  /**
    * Cek apakah reviewer berhak memutuskan pengajuan target.
    */
   async canReview(params: {
@@ -388,8 +389,8 @@ export const ApprovalRoutingService = {
    * Cek apakah reviewer berhak memutuskan absen luar radius. Tahap diturunkan
    * dari Role pemilik (`resolveAttendanceReviewerRole`), lalu modul routing
    * memutuskan — termasuk Manager yang mengambil tahap SUPERVISOR milik Divisi
-   * tanpa Supervisor Divisi aktif. ADMIN tetap boleh memutuskan absensi siapa
-   * pun selain miliknya sendiri (`canReviewAttendance`).
+   * tanpa Supervisor Divisi aktif. ADMIN boleh memutuskan absensi siapa pun;
+   * tidak ada yang boleh memutuskan absensinya sendiri.
    */
   async canReviewAttendance(
     reviewer: { id: string; role: Role; positionId?: string | null },
@@ -405,7 +406,7 @@ export const ApprovalRoutingService = {
     const owner = attendance.user;
 
     if (reviewer.id === owner.id) return false;
-    if (reviewer.role === Role.ADMIN) return canReviewAttendance(reviewer, owner);
+    if (reviewer.role === Role.ADMIN) return true;
 
     const stage = resolveAttendanceReviewerRole(owner.role);
     if (!stage) return false;

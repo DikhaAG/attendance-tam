@@ -1,5 +1,4 @@
-import prisma from "@/lib/prisma";
-import { Prisma } from "@/generated/prisma";
+import prisma, { type Db } from "@/lib/prisma";
 import {
   DIVISION_STRUCTURE,
   planDivisionMapping,
@@ -17,8 +16,6 @@ import { MigrationService } from "@/servers/services/migration.service";
 
 /** Migrasi tiket 09 (tabel Division/Position + `User.positionId`). */
 export const REQUIRED_MIGRATION = "20261118020000_division_position";
-
-type Db = Prisma.TransactionClient;
 
 async function loadPlan(db: Db, entries: MappingEntry[]) {
   // Berurutan, bukan Promise.all: `db` bisa berupa transaksi interaktif.
@@ -66,7 +63,8 @@ export const DivisionMappingService = {
   /**
    * Buat struktur yang belum ada lalu petakan user, dalam satu transaksi.
    * Idempoten: jalan kedua tidak membuat dan tidak memetakan apa pun.
-   * `remaining` = struktur + pemetaan yang tersisa sesudahnya (seharusnya 0).
+   * Kalau sesudahnya masih ada struktur/pemetaan tersisa, melempar error
+   * sehingga seluruh transaksi di-rollback (`remaining` yang kembali selalu 0).
    */
   async apply(entries: MappingEntry[]) {
     return prisma.$transaction(
@@ -105,17 +103,20 @@ export const DivisionMappingService = {
           await DivisionService.assignPosition({ userId, positionId }, tx);
         }
 
+        // Lempar, jangan kembalikan: hanya error yang membuat transaksi di-rollback.
         const after = await loadPlan(tx, entries);
         if (!after.ok) throw new Error(`Pemetaan tidak tuntas:${after.error}`);
+        const remaining =
+          after.createDivisions.length +
+          after.createPositions.length +
+          after.assignments.length;
+        if (remaining > 0) {
+          throw new Error(
+            `Pemetaan tidak tuntas: ${remaining} struktur/pemetaan tersisa sesudah apply — transaksi dibatalkan.`,
+          );
+        }
 
-        return {
-          ...before,
-          assigned: ready.assignments.length,
-          remaining:
-            after.createDivisions.length +
-            after.createPositions.length +
-            after.assignments.length,
-        };
+        return { ...before, assigned: ready.assignments.length, remaining };
       },
       { timeout: 30_000 },
     );

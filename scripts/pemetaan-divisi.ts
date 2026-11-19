@@ -8,8 +8,8 @@
  * `scripts/pemetaan-divisi.example.csv` (JSON juga boleh: array
  * `{ userId, email, jabatan }`). Nama
  * `pemetaan-divisi*.csv` / `pemetaan-divisi*.json` diabaikan git.
- * User aktif berteks jabatan persis "Teknisi" yang tidak disebut file
- * otomatis mendapat Jabatan Teknisi.
+ * Setiap orang yang dipetakan harus disebut file (id + email), termasuk
+ * semua Teknisi — tidak ada pemetaan otomatis dari teks jabatan.
  *
  * Langkah:
  *   1. BACKUP database dulu (pg_dump).
@@ -23,7 +23,10 @@
  * ada yang ditulis. `--apply` berjalan dalam satu transaksi dan idempoten —
  * jalan kedua tidak mengubah apa pun. Berhenti total kalau: migrasi tiket 09
  * belum diterapkan, id/email di file tidak cocok, Role tidak sesuai dugaan
- * Jabatannya, akun nonaktif disebut, atau user sudah memegang Jabatan lain.
+ * Jabatannya, akun nonaktif disebut, user sudah memegang Jabatan lain, atau
+ * ada user aktif berteks jabatan persis "Teknisi" yang tidak disebut file
+ * (snapshot sudah usang — tambahkan orangnya ke file). Kalau sesudah apply
+ * masih ada yang tersisa, seluruh transaksi dibatalkan.
  */
 
 import "dotenv/config";

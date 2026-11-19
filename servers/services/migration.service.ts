@@ -1,7 +1,4 @@
-import prisma from "@/lib/prisma";
-import { Prisma } from "@/generated/prisma";
-
-type Db = Prisma.TransactionClient;
+import prisma, { type Db } from "@/lib/prisma";
 
 /**
  * Pengaman skrip sekali jalan (`scripts/koreksi-sabtu.ts`, skrip pemetaan

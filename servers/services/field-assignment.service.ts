@@ -5,6 +5,7 @@ import {
   Role,
   TransportationType,
 } from "@/generated/prisma";
+import { ApprovalRoutingService } from "./approval-routing.service";
 
 export type FieldAssignmentListOptions = {
   createdById?: string;
@@ -30,6 +31,8 @@ export type FieldAssignmentCreator = { positionId: string | null };
  * Karyawan yang boleh ditugaskan seorang Supervisor: EMPLOYEE aktif di Divisi
  * Supervisor itu. Supervisor tanpa Jabatan boleh memilih semua karyawan
  * (spec §2 Dinas luar). Satu filter untuk pemilih dan validasi server.
+ * Jabatan yang tidak ditemukan (mis. dihapus setelah sesi dimuat) → gagal
+ * tertutup: tidak ada yang bisa ditugaskan.
  */
 async function assignableWhere(
   creator: FieldAssignmentCreator,
@@ -38,14 +41,13 @@ async function assignableWhere(
 
   if (!creator.positionId) return base;
 
-  const position = await prisma.position.findUnique({
-    where: { id: creator.positionId },
-    select: { divisionId: true },
+  const divisionId = await ApprovalRoutingService.getUserDivisionId({
+    positionId: creator.positionId,
   });
 
-  if (!position) return base;
+  if (!divisionId) return { id: { in: [] } };
 
-  return { ...base, jobPosition: { divisionId: position.divisionId } };
+  return { ...base, jobPosition: { divisionId } };
 }
 
 export const FieldAssignmentService = {
@@ -58,17 +60,22 @@ export const FieldAssignmentService = {
     });
   },
 
-  /** True kalau semua id termasuk karyawan yang boleh ditugaskan Supervisor ini. */
+  /**
+   * True kalau semua id termasuk karyawan yang boleh ditugaskan Supervisor ini.
+   * `employeeIds` harus sudah tanpa duplikat (dibuang action pemanggil) — id
+   * dobel membuat hasilnya false.
+   */
   async areAssignable(
     creator: FieldAssignmentCreator,
     employeeIds: string[],
   ): Promise<boolean> {
-    const uniqueIds = [...new Set(employeeIds)];
     const count = await prisma.user.count({
-      where: { ...(await assignableWhere(creator)), id: { in: uniqueIds } },
+      where: {
+        AND: [await assignableWhere(creator), { id: { in: employeeIds } }],
+      },
     });
 
-    return count === uniqueIds.length;
+    return count === employeeIds.length;
   },
 
   async list(opts: FieldAssignmentListOptions = {}) {

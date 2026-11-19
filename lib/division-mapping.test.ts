@@ -74,8 +74,21 @@ describe("rencana pemetaan dari database kosong", () => {
   });
 });
 
-describe("aturan teks jabatan \"Teknisi\"", () => {
-  it("user aktif berteks persis \"Teknisi\" yang tidak ada di file → Jabatan Teknisi; file tetap menang", () => {
+describe("teks jabatan \"Teknisi\" hanya pemeriksa, bukan sumber pemetaan", () => {
+  it("user aktif berteks persis \"Teknisi\" yang ada di file dipetakan sesuai file", () => {
+    const plan = planDivisionMapping({
+      ...empty,
+      users: [eko, fajar],
+      entries: [entry(eko, "Teknisi"), entry(fajar, "Teknisi (EoS)")],
+    });
+
+    expect(plan.ok && plan.assignments.map(({ userId, jabatan }) => [userId, jabatan])).toEqual([
+      ["u_eko", "Teknisi"],
+      ["u_fajar", "Teknisi (EoS)"],
+    ]);
+  });
+
+  it("user aktif berteks persis \"Teknisi\" yang tidak ada di file → berhenti (snapshot usang), menyebut orangnya", () => {
     const harry = user({ id: "u_harry", name: "Harry", position: "Teknisi" });
     const lowercase = user({ id: "u_low", name: "Lowercase", position: "teknisi" });
     const keluar = user({ id: "u_out", name: "Sudah Keluar", position: "Teknisi", isActive: false });
@@ -83,14 +96,15 @@ describe("aturan teks jabatan \"Teknisi\"", () => {
     const plan = planDivisionMapping({
       ...empty,
       users: [eko, fajar, harry, lowercase, keluar],
-      entries: [entry(fajar, "Teknisi (EoS)")],
+      entries: [entry(eko, "Teknisi"), entry(fajar, "Teknisi (EoS)")],
     });
 
-    expect(plan.ok && plan.assignments.map(({ userId, jabatan }) => [userId, jabatan])).toEqual([
-      ["u_fajar", "Teknisi (EoS)"],
-      ["u_eko", "Teknisi"],
-      ["u_harry", "Teknisi"],
-    ]);
+    expect(plan).toEqual({
+      ok: false,
+      errors: [
+        "Harry (u_harry) aktif berteks jabatan \"Teknisi\" tapi tidak ada di file pemetaan — snapshot sudah usang? Tambahkan ke file.",
+      ],
+    });
   });
 });
 
@@ -126,7 +140,7 @@ describe("idempoten terhadap pemetaan yang sudah ada", () => {
     const plan = planDivisionMapping({
       ...existing,
       users: [{ ...ana, positionId: "p_spv_admin" }, budi, { ...eko, positionId: "p_teknisi" }],
-      entries: [entry(ana, "Supervisor Admin"), entry(budi, "Admin")],
+      entries: [entry(ana, "Supervisor Admin"), entry(budi, "Admin"), entry(eko, "Teknisi")],
     });
 
     expect(plan).toMatchObject({
@@ -177,7 +191,7 @@ describe("idempoten terhadap pemetaan yang sudah ada", () => {
 });
 
 describe("berhenti total kalau ada yang tidak cocok", () => {
-  const errorsFor = (entries: MappingEntry[], users: MappingUser[] = [ana, budi, citra, dodi, eko, reza]) => {
+  const errorsFor = (entries: MappingEntry[], users: MappingUser[] = [ana, budi, citra, dodi, reza]) => {
     const plan = planDivisionMapping({ ...empty, users, entries });
     return plan.ok ? [] : plan.errors;
   };
@@ -186,17 +200,17 @@ describe("berhenti total kalau ada yang tidak cocok", () => {
     [
       "id tidak ada di database",
       { userId: "u_hilang", email: "hilang@contoh.test", jabatan: "Admin" },
-      "Baris u_hilang: user tidak ada di database.",
+      "User u_hilang: user tidak ada di database.",
     ],
     [
       "email tidak sama dengan email user ber-id itu",
       { userId: "u_budi", email: "orang-lain@contoh.test", jabatan: "Admin" },
-      "Baris u_budi: email tidak cocok dengan user Budi Admin.",
+      "User u_budi: email tidak cocok dengan user Budi Admin.",
     ],
     [
       "Jabatan tidak ada di struktur",
       { ...entry(budi, "Kasir") },
-      "Baris u_budi: Jabatan \"Kasir\" tidak ada di struktur (Supervisor Admin, Admin, Supervisor Teknis, Teknisi, Teknisi (EoS), Programmer).",
+      "User u_budi: Jabatan \"Kasir\" tidak ada di struktur (Supervisor Admin, Admin, Supervisor Teknis, Teknisi, Teknisi (EoS), Programmer).",
     ],
     [
       "Supervisor Admin bukan Role SUPERVISOR",
@@ -226,14 +240,27 @@ describe("berhenti total kalau ada yang tidak cocok", () => {
 
   it("user yang sama disebut dua kali", () => {
     expect(errorsFor([entry(budi, "Admin"), entry(budi, "Admin")])).toEqual([
-      "Baris u_budi: user disebut lebih dari sekali di file.",
+      "User u_budi: user disebut lebih dari sekali di file.",
     ]);
   });
 
-  it("aturan teks \"Teknisi\" juga memeriksa Role", () => {
-    const spv = user({ id: "u_spv", name: "Supervisor Berteks Teknisi", role: "SUPERVISOR", position: "Teknisi" });
-    expect(errorsFor([], [spv])).toEqual([
-      "Supervisor Berteks Teknisi (u_spv) ber-Role SUPERVISOR, padahal Teknisi diduga EMPLOYEE.",
+  it("pesan memakai nomor baris file pemetaan yang asli", () => {
+    const csv = [
+      "userId,email,jabatan",
+      "# Divisi Admin",
+      `${ana.id},${ana.email},Supervisor Admin`,
+      "",
+      "u_hilang,hilang@contoh.test,Admin",
+      `${budi.id},orang-lain@contoh.test,Admin`,
+      `${ana.id},${ana.email},Supervisor Admin`,
+    ].join("\n");
+    const parsed = parseDivisionMapping(csv, "pemetaan-divisi.csv");
+    if (!parsed.ok) throw new Error(parsed.errors.join("\n"));
+
+    expect(errorsFor(parsed.entries)).toEqual([
+      "Baris 5: user tidak ada di database.",
+      "Baris 6: email tidak cocok dengan user Budi Admin.",
+      "Baris 7: user disebut lebih dari sekali di file.",
     ]);
   });
 
@@ -248,7 +275,7 @@ describe("berhenti total kalau ada yang tidak cocok", () => {
 });
 
 describe("file pemetaan lokal (CSV atau JSON)", () => {
-  const expected = [
+  const rows = [
     { userId: "u_ana", email: "ana@contoh.test", jabatan: "Supervisor Admin" },
     { userId: "u_fajar", email: "fajar@contoh.test", jabatan: "Teknisi (EoS)" },
   ];
@@ -263,13 +290,22 @@ describe("file pemetaan lokal (CSV atau JSON)", () => {
       "",
     ].join("\r\n");
 
-    expect(parseDivisionMapping(csv, "pemetaan-divisi.csv")).toEqual({ ok: true, entries: expected });
+    expect(parseDivisionMapping(csv, "pemetaan-divisi.csv")).toEqual({
+      ok: true,
+      entries: [
+        { ...rows[0], line: 3 },
+        { ...rows[1], line: 5 },
+      ],
+    });
   });
 
   it("JSON berupa array objek", () => {
-    expect(parseDivisionMapping(JSON.stringify(expected), "pemetaan-divisi.json")).toEqual({
+    expect(parseDivisionMapping(JSON.stringify(rows), "pemetaan-divisi.json")).toEqual({
       ok: true,
-      entries: expected,
+      entries: [
+        { ...rows[0], line: 1 },
+        { ...rows[1], line: 2 },
+      ],
     });
   });
 

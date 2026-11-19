@@ -32,7 +32,8 @@ tidak ada Pengajuan yang hilang dari antrean.
   Prisma: `getApprovalScope()`, `canReviewRequest()`, `isTurnToReview()`,
   `canViewRequest()`. Uji di `lib/approval-routing.test.ts`.
 - `servers/services/approval-routing.service.ts` — menerjemahkan cakupan jadi
-  filter Prisma (`build{Leave,Overtime,Attendance}WhereForScope()`, versi
+  filter Prisma (`build{Leave,Overtime,Attendance}WhereForScope()`, semuanya
+  lewat satu `buildWhereForScope()` dengan potongan filter per tahap; versi
   `ForViewer` untuk riwayat desktop) dan cek kewenangan
   (`ApprovalRoutingService.canReview{Leave,Overtime,Attendance}()`). Semua
   server action dan API review memanggilnya, jadi antrean, badge
@@ -45,7 +46,10 @@ tidak ada Pengajuan yang hilang dari antrean.
 (`resolveAttendanceReviewerRole()` / `ownerRolesForAttendanceReviewer()` di
 `lib/attendance.ts`) — Karyawan & Admin di tahap SUPERVISOR, Supervisor di tahap
 MANAGER. Cakupan Divisi ditumpuk di atasnya. Admin tetap boleh memutuskan
-absensi siapa pun kecuali miliknya sendiri. Bukti:
+absensi siapa pun kecuali miliknya sendiri — aturan ini hanya ada di
+`ApprovalRoutingService` (`getAttendanceScopeForReviewer()` memberi Admin
+cakupan `admin` untuk antrean & "Setujui semua"; `canReviewAttendance()` untuk
+keputusan satu per satu). Bukti:
 `servers/services/attendance-routing.service.int.test.ts`.
 
 ## Dinas luar
@@ -56,11 +60,16 @@ Dinas luar selalu diajukan Supervisor dan disetujui **Manager**
 `FieldAssignmentService.listAssignableEmployees()` / `areAssignable()` —
 Supervisor Divisi hanya bisa menugaskan anggota Divisinya. Beda dengan routing
 di atas: karyawan **tanpa Jabatan** tidak muncul di pemilih Supervisor Divisi,
-hanya di pemilih Supervisor tanpa Jabatan.
+hanya di pemilih Supervisor tanpa Jabatan. Jabatan Supervisor yang tidak
+ditemukan lagi (mis. dihapus setelah sesi dimuat) → gagal tertutup: tidak ada
+karyawan yang bisa dipilih.
 
 ## Mengisi Jabatan awal
 
 `scripts/pemetaan-divisi.ts` (aturan di `lib/division-mapping.ts`) membuat
-Divisi & Jabatan awal lalu memetakan user dari file pemetaan lokal; cara jalan
-dan syarat berhentinya ada di kepala file skrip itu. Untuk produksi, pakai
+Divisi & Jabatan awal lalu memetakan user dari file pemetaan lokal. Setiap
+orang yang dipetakan harus disebut file (id + email); user aktif berteks
+jabatan persis "Teknisi" yang tidak ada di file membuat skrip berhenti
+(snapshot usang). Cara jalan dan syarat berhenti lainnya ada di kepala file
+skrip itu. Untuk produksi, pakai
 `scripts/wizard-skrip-produksi.sh`.

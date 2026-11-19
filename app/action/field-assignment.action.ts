@@ -74,7 +74,8 @@ export async function createFieldAssignment(
   }
 
   // Karyawan yang dipilih harus EMPLOYEE aktif di Divisi Supervisor ini —
-  // dicek di server, bukan cuma dipercaya dari pilihan client.
+  // dicek di server, bukan cuma dipercaya dari pilihan client. Satu-satunya
+  // tempat id dobel dibuang; dipakai untuk validasi dan penyimpanan.
   const uniqueIds = [...new Set(parsed.data.employeeIds)];
 
   if (!(await FieldAssignmentService.areAssignable(user, uniqueIds))) {

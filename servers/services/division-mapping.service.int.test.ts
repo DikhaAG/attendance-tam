@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Role } from "@/generated/prisma";
 import type { MappingEntry } from "@/lib/division-mapping";
@@ -47,6 +47,8 @@ async function arrangeOrganization() {
     entry(dewi, "Admin"),
     entry(sopi, "Admin"),
     entry(dwi, "Supervisor Teknis"),
+    entry(tono, "Teknisi"),
+    entry(tini, "Teknisi"),
     entry(heri, "Teknisi (EoS)"),
     entry(dafa, "Programmer"),
   ];
@@ -139,6 +141,11 @@ describe("berhenti total tanpa menulis apa pun", () => {
       },
       /sudah memegang Jabatan lain \(Teknisi · Divisi Teknis\), bukan Programmer/,
     ],
+    [
+      "user aktif berteks \"Teknisi\" tidak ada di file (snapshot usang)",
+      async ({ tini, entries }) => entries.filter((e) => e.userId !== tini.id),
+      /Tini \(.+\) aktif berteks jabatan "Teknisi" tapi tidak ada di file pemetaan/,
+    ],
   ])("%s", async (_, arrange, message) => {
     const org = await arrangeOrganization();
     const entries = await arrange(org);
@@ -148,6 +155,25 @@ describe("berhenti total tanpa menulis apa pun", () => {
 
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error).toMatch(message);
+    expect(await snapshot()).toEqual(before);
+  });
+});
+
+describe("pemetaan yang tidak tuntas dibatalkan seluruhnya", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sisa pemetaan > 0 sesudah apply → transaksi di-rollback, struktur pun tidak tertulis", async () => {
+    const org = await arrangeOrganization();
+    const before = await snapshot();
+    // Tiru penulisan Jabatan yang diam-diam tidak terjadi.
+    vi.spyOn(DivisionService, "assignPosition").mockResolvedValue(
+      undefined as never,
+    );
+
+    await expect(DivisionMappingService.apply(org.entries)).rejects.toThrow(/tidak tuntas/);
+
     expect(await snapshot()).toEqual(before);
   });
 });

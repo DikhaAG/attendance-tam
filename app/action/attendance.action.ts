@@ -579,8 +579,8 @@ export async function reviewAttendance(
 
 /**
  * Setujui sekaligus semua absensi luar radius yang jadi giliran reviewer yang
- * login (cakupan Divisi dari `ApprovalRoutingService.getScopeForReviewer`;
- * ADMIN: semua), sesuai klaim karyawan — tanpa
+ * login (`ApprovalRoutingService.getAttendanceScopeForReviewer`: cakupan
+ * Divisi, atau semua untuk ADMIN), sesuai klaim karyawan — tanpa
  * menimpa mode. Yang butuh penilaian lain (mis. diubah jadi sakit) tetap
  * lewat `reviewAttendance` satu per satu.
  */
@@ -592,9 +592,7 @@ export async function approveAllPendingAttendance(): Promise<ReviewAttendanceRes
   ]);
 
   const scope =
-    reviewer.role === Role.ADMIN
-      ? undefined
-      : await ApprovalRoutingService.getScopeForReviewer(reviewer);
+    await ApprovalRoutingService.getAttendanceScopeForReviewer(reviewer);
 
   const approved = await AttendanceService.approveAllPending({
     scope,

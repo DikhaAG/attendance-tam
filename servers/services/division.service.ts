@@ -1,14 +1,10 @@
-import prisma from "@/lib/prisma";
-import type { Prisma } from "@/generated/prisma";
+import prisma, { type Db } from "@/lib/prisma";
 import type { PositionGroup } from "@/lib/division";
 import type {
   AssignPositionDTO,
   DivisionDTO,
   PositionDTO,
 } from "../validators/division.validator";
-
-/** Klien Prisma atau transaksi pemanggil (skrip pemetaan Divisi, tiket 14). */
-type Db = Prisma.TransactionClient;
 
 /** Hasil hapus yang ditolak karena masih ada isinya. */
 export type DeleteOutcome =
@@ -72,8 +68,8 @@ export const DivisionService = {
     });
   },
 
-  async createDivision(data: DivisionDTO, db: Db = prisma) {
-    return db.division.create({ data: { name: data.name } });
+  async createDivision(data: DivisionDTO, db?: Db) {
+    return (db ?? prisma).division.create({ data: { name: data.name } });
   },
 
   async renameDivision(id: string, data: DivisionDTO) {
@@ -91,8 +87,8 @@ export const DivisionService = {
     });
   },
 
-  async createPosition(data: PositionDTO, db: Db = prisma) {
-    return db.position.create({
+  async createPosition(data: PositionDTO, db?: Db) {
+    return (db ?? prisma).position.create({
       data: { name: data.name, divisionId: data.divisionId },
     });
   },

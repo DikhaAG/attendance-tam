@@ -6,7 +6,10 @@ import {
   WorkMode,
 } from "@/generated/prisma";
 import type { ApprovalScope } from "@/lib/approval-routing";
-import { buildAttendanceWhereForScope } from "./approval-routing.service";
+import {
+  buildAttendanceWhereForScope,
+  type AttendanceScope,
+} from "./approval-routing.service";
 import { CreateAttendanceDTO } from "../validators/attendance.validator";
 
 export type DailyAttendance = {
@@ -159,13 +162,13 @@ export const AttendanceService = {
 
   /**
    * Setujui sekaligus semua absensi luar radius yang masih PENDING dalam
-   * cakupan reviewer (`scope`; tanpa `scope` = antrean admin, semua Role),
+   * cakupan reviewer (`ApprovalRoutingService.getAttendanceScopeForReviewer`),
    * sesuai klaim karyawan (`approvedMode = workMode`). Hanya menyentuh klaim
    * `LUAR_RADIUS` — satu-satunya mode yang pernah PENDING dan tidak butuh
    * hitung ulang keterlambatan. Mengembalikan jumlah yang berhasil disetujui.
    */
   async approveAllPending(data: {
-    scope?: ApprovalScope;
+    scope: AttendanceScope;
     excludeUserId: string;
     reviewedById: string;
     reviewNote: string;
@@ -173,9 +176,7 @@ export const AttendanceService = {
     const { count } = await prisma.attendance.updateMany({
       where: {
         AND: [
-          data.scope
-            ? buildAttendanceWhereForScope(data.scope)
-            : { approvalStatus: AttendanceApproval.PENDING },
+          buildAttendanceWhereForScope(data.scope),
           {
             workMode: WorkMode.LUAR_RADIUS,
             userId: { not: data.excludeUserId },

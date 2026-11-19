@@ -73,6 +73,16 @@ describe("pilihan karyawan Dinas luar", () => {
   });
 });
 
+describe("Jabatan Supervisor tidak ditemukan (mis. dihapus setelah sesi dimuat)", () => {
+  it("gagal tertutup: tidak ada karyawan yang bisa dipilih maupun ditugaskan", async () => {
+    const { harry } = await organisasi();
+    const basi = { positionId: "jabatan-sudah-dihapus" };
+
+    expect(await FieldAssignmentService.listAssignableEmployees(basi)).toEqual([]);
+    expect(await FieldAssignmentService.areAssignable(basi, [harry.id])).toBe(false);
+  });
+});
+
 describe("validasi server Dinas luar", () => {
   it("menerima anggota Divisi Supervisor", async () => {
     const { dwiky, harry } = await organisasi();
