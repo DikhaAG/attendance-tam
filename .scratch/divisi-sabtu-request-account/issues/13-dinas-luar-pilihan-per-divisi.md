@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 Repo: attendance-tam
 Blocked by: 11
 
@@ -17,7 +17,23 @@ Spec: `../spec.md` (§2 Dinas luar). User story 40–41.
 
 ## Kriteria selesai
 
-- [ ] Dwiky (Supervisor Teknis) hanya melihat anggota Divisi Teknis di
+- [x] Dwiky (Supervisor Teknis) hanya melihat anggota Divisi Teknis di
       pemilih; mengirim id anggota Divisi Admin lewat API ditolak.
-- [ ] Mobile 1.1.0 tidak perlu diubah.
-- [ ] lint + `tsc --noEmit` hijau.
+- [x] Mobile 1.1.0 tidak perlu diubah.
+- [x] lint + `tsc --noEmit` hijau.
+
+## Comments
+
+- Satu filter untuk pemilih dan validasi: `FieldAssignmentService.listAssignableEmployees()`
+  (form web `/supervisor/dinas-luar` + `GET /api/users`, dipakai juga web mobile) dan
+  `FieldAssignmentService.areAssignable()` (aksi `createFieldAssignment`, juga di balik
+  `POST /api/field-assignment`). Diuji di `servers/services/field-assignment.service.int.test.ts`
+  dengan skenario Dwiky (Divisi Teknis) vs anggota Divisi Admin.
+- Karyawan **tanpa Jabatan** tidak muncul di pemilih Supervisor Divisi (dibaca
+  ketat: "hanya anggota Divisi"); hanya Supervisor tanpa Jabatan yang bisa
+  menugaskan mereka. Beda dengan routing Pengajuan (pemohon tanpa Jabatan
+  terlihat semua Supervisor) — ubah `assignableWhere()` kalau ingin disamakan.
+- Mobile 1.1.0: bentuk respons `GET /api/users` (`{ items: [{ id, name, position }] }`)
+  tidak berubah; `../mobile-tam/src/lib/queries.ts` membacanya apa adanya.
+- `npm run check` hijau (lint 0 error, typecheck, unit, integration). Belum dicek
+  visual di browser.
