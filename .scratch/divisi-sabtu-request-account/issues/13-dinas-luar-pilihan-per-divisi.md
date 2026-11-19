@@ -37,3 +37,14 @@ Spec: `../spec.md` (§2 Dinas luar). User story 40–41.
   tidak berubah; `../mobile-tam/src/lib/queries.ts` membacanya apa adanya.
 - `npm run check` hijau (lint 0 error, typecheck, unit, integration). Belum dicek
   visual di browser.
+
+**2026-11-19 (review)** — Perbaikan hasil code review:
+- `assignableWhere()` kini gagal tertutup: Jabatan Supervisor yang tidak
+  ditemukan (mis. dihapus setelah sesi dimuat) → tidak ada karyawan yang bisa
+  dipilih/ditugaskan (dulu jatuh ke "semua karyawan"). Divisi dibaca lewat
+  `ApprovalRoutingService.getUserDivisionId()`, bukan query Position sendiri.
+  Integration test baru di `field-assignment.service.int.test.ts`.
+- Id dobel hanya dibuang sekali, di `createFieldAssignment`; `areAssignable()`
+  menerima id unik dan menggabungkan filter lewat `AND` (spread lama bisa
+  menimpa filter `id`).
+- `npm run check` hijau.

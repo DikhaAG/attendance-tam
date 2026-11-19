@@ -48,3 +48,17 @@ Menerapkan modul aturan routing (tiket 11) ke approval absen luar radius:
   `/api/attendance/pending` dan endpoint review sama), bukan dengan menjalankan app.
 - `npm run check` hijau (lint 0 error, typecheck, unit, integration).
 
+
+**2026-11-19 (review)** — Perbaikan hasil code review, perilaku tidak berubah:
+- `canReviewAttendance()` di `lib/attendance.ts` dihapus (cabang non-admin sudah
+  mati dan buta Divisi). Aturan Admin kini hanya di `ApprovalRoutingService`:
+  `canReviewAttendance()` (satu cek self-review) dan
+  `getAttendanceScopeForReviewer()` yang memberi Admin cakupan `{ kind: "admin" }`.
+  `ownerRolesForAttendanceReviewer()` tidak lagi punya cabang ADMIN.
+- `approveAllPendingAttendance` selalu meneruskan cakupan eksplisit;
+  `AttendanceService.approveAllPending({ scope })` kini wajib (`AttendanceScope`),
+  tidak ada lagi "tanpa scope = admin".
+- Tiga switch cakupan (`build{Leave,Overtime,Attendance}WhereForScope`) dirakit
+  dari satu `buildWhereForScope()` dengan potongan filter per tahap. Bentuk
+  filter izin/lembur identik (unit test lama hijau); filter absensi setara.
+- `npm run check` hijau.

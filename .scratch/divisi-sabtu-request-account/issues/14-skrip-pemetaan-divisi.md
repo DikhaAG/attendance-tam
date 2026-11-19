@@ -104,3 +104,20 @@ user rekaan: dry-run → apply (6 dipetakan) → apply kedua (0, 6 dilewati).
 **Belum (langkah manusia):** file pemetaan asli belum disusun (butuh snapshot
 `User` produksi); dry-run/apply ke salinan produksi dan cek `/admin/divisi`
 belum dilakukan.
+
+**2026-11-19 (review)** — Perbaikan hasil code review:
+- **Aturan "Teknisi" berubah:** tidak ada lagi pemetaan otomatis dari teks
+  jabatan. Setiap orang yang dipetakan harus disebut file (id + email),
+  termasuk semua Teknisi. User aktif berteks jabatan persis "Teknisi" yang
+  tidak ada di file → berhenti dengan pesan yang menyebut nama + id-nya
+  (snapshot sudah usang). Contoh CSV, kepala skrip, dan
+  `docs/approval-routing.md` diperbarui. File pemetaan asli nanti wajib
+  memuat semua Teknisi.
+- `DivisionMappingService.apply()` melempar error (bukan mengembalikan hasil)
+  kalau sesudah apply masih ada struktur/pemetaan tersisa, jadi transaksi
+  di-rollback. Integration test baru membuktikan tidak ada yang tertulis.
+- Pesan error memakai nomor baris file asli (`Baris 5: …`, JSON: urutan objek);
+  tanpa nomor baris ditulis `User <id>: …`, bukan `Baris <id>`.
+- `DivisionService.createDivision/createPosition/assignPosition` sama-sama
+  menerima `db?: Db`; `type Db` kini satu, diekspor `lib/prisma.ts`.
+- `npm run check` hijau.
