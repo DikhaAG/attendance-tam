@@ -9,6 +9,7 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 - Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
+- Done-criteria only a human can verify (production data or backups, `--apply` to production, real devices) go under a separate `## Langkah manusia` heading, not `## Kriteria selesai`. An agent that finishes every `Kriteria selesai` box sets `Status: ready-for-human` while `Langkah manusia` boxes remain open, and `resolved` only when none do.
 
 ## When a skill says "publish to the issue tracker"
 

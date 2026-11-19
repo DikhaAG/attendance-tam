@@ -43,14 +43,24 @@ dugaan.
 
 ## Kriteria selesai
 
-- [ ] Dry-run ke salinan DB lokal melaporkan pemetaan persis seperti di atas.
 - [ ] `--apply` dua kali: kali kedua tidak mengubah apa pun.
-- [ ] Setelah apply, `/admin/divisi` menampilkan pohon yang benar; tidak ada
-      Divisi tanpa Supervisor; "Belum punya Jabatan" berisi akun yang memang
-      tidak dipetakan.
+
+## Langkah manusia
+
+Alurnya dipandu `scripts/wizard-skrip-produksi.sh`.
+
+- [ ] Dry-run ke salinan DB lokal (restore backup produksi) melaporkan
+      pemetaan persis seperti di atas.
+- [ ] Setelah apply ke salinan, `/admin/divisi` menampilkan pohon yang benar;
+      tidak ada Divisi tanpa Supervisor; "Belum punya Jabatan" berisi akun yang
+      memang tidak dipetakan.
+- [ ] Backup produksi, lalu `--apply` ke produksi.
 
 ## Catatan
 
 - Agent tidak menjalankan `--apply` ke produksi.
+- Pola acuan: `scripts/koreksi-sabtu.ts` (tiket 06) — rencana bebas Prisma di
+  `lib/`, service yang baca/tulis dalam satu transaksi, CLI tipis. Cek migrasi
+  pakai `MigrationService.checkApplied()` (sudah menolak database kosong).
 - Output dry-run cukup menampilkan nama + Jabatan; email hanya dipakai untuk
   pencocokan, tidak perlu dicetak.

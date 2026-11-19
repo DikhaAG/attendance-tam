@@ -28,13 +28,19 @@ kalau Jam Pulang Sabtu di `WorkDay` bukan hari kerja.
 
 ## Kriteria selesai
 
+- [x] Menjalankan `--apply` dua kali: kali kedua 0 baris.
+- [x] Ada petunjuk singkat di header skrip: backup dulu, dry-run dulu.
+
+## Langkah manusia
+
+Alurnya dipandu `scripts/wizard-skrip-produksi.sh`.
+
 - [ ] Dry-run ke salinan DB lokal (restore backup produksi) melaporkan
       **47 baris**; dua anomali (pulang 05:00 & 07:01) dan 12 baris 14:00
       **tidak** tersentuh.
-- [x] Menjalankan `--apply` dua kali: kali kedua 0 baris.
-- [ ] Setelah apply, baris tampil berlabel "Diubah admin" di halaman
-      kehadiran admin dengan jam asli terlihat.
-- [x] Ada petunjuk singkat di header skrip: backup dulu, dry-run dulu.
+- [ ] Setelah apply ke salinan, baris tampil berlabel "Diubah admin" di
+      halaman kehadiran admin dengan jam asli terlihat.
+- [ ] Backup produksi, lalu `--apply` ke produksi.
 
 ## Catatan
 

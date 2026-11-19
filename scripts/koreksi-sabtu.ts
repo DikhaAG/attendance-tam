@@ -9,6 +9,9 @@
  *   2. Dry-run dulu, periksa tabelnya:   npx tsx scripts/koreksi-sabtu.ts
  *   3. Baru tulis:                        npx tsx scripts/koreksi-sabtu.ts --apply
  *
+ * Ketiganya (plus restore ke salinan lokal dan gladi --apply) dipandu:
+ *   scripts/wizard-skrip-produksi.sh
+ *
  * Membaca `DATABASE_URL` dari environment atau `.env`. Tanpa `--apply` tidak
  * ada yang ditulis. `--apply` berjalan dalam satu transaksi dan idempoten —
  * jalan kedua mengoreksi 0 baris. Berhenti total kalau ada yang tidak cocok:

@@ -441,6 +441,9 @@ model Attendance {
   type      AttendanceType
   /// Tanggal kerja (tanpa jam) — dipakai untuk mencegah absen ganda per hari
   workDate  DateTime       @db.Date
+  /// Kolom `TIMESTAMP(3)` TANPA zona berisi jam UTC (berlaku untuk semua
+  /// `DateTime` non-`@db.Date`). SQL mentah (fixture, cek produksi via psql)
+  /// menulis/membaca jam UTC: 17:00 WIB = '… 10:00', bukan '… 17:00+07'.
   timestamp DateTime       @default(now())
 
   /// Null untuk absensi yang dicatat admin manual — tidak ada foto/GPS yang terekam.
