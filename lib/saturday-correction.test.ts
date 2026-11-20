@@ -12,7 +12,7 @@ const SATURDAY: WorkDayConfig = {
   isWorkingDay: true,
   checkInTime: "08:00",
   checkOutTime: "14:00",
-  overtimeStartTime: "15:00",
+  overtimeStartTime: "14:00",
 };
 
 /** Sabtu 14 Nov 2026 dan Jumat sehari sebelumnya (kolom `date`). */

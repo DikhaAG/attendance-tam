@@ -427,7 +427,8 @@ model WorkDay {
   checkInTime       String // "HH:mm"
   checkOutTime      String // "HH:mm"
   /// Jam Mulai Lembur ("HH:mm") — berdiri sendiri, tidak ikut berubah saat
-  /// `checkOutTime` diubah. Diisi `checkOutTime` + 1 jam oleh migrasinya.
+  /// `checkOutTime` diubah. Diisi `checkOutTime` + 1 jam oleh migrasinya; Sabtu
+  /// lalu diset sama dengan `checkOutTime` (Lembur Sabtu mulai tepat di Jam Pulang).
   overtimeStartTime String   @default("18:00")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -521,7 +522,7 @@ model Overtime {
 
   /// Tanggal kerja saat lembur dimulai — dipakai untuk grouping/listing.
   workDate DateTime @db.Date
-  /// Jam mulai lembur yang dipilih karyawan, selalu >= 18:00 waktu lokal.
+  /// Jam mulai lembur yang dipilih karyawan, selalu >= Jam Mulai Lembur Hari Kerja itu.
   startAt  DateTime
   reason   String
 

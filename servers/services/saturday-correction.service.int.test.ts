@@ -31,7 +31,7 @@ async function saveWeek(saturday: { isWorkingDay: boolean; checkOutTime: string 
       checkInTime: "08:00",
       checkOutTime: "17:00",
       overtimeStartTime: "18:00",
-      ...(dayOfWeek === 6 ? { ...saturday, overtimeStartTime: "15:00" } : {}),
+      ...(dayOfWeek === 6 ? { ...saturday, overtimeStartTime: "14:00" } : {}),
     })),
   });
 }

@@ -388,3 +388,12 @@ seharusnya 14:00". Hasil yang diharapkan saat ini: **47 baris**.
     luar, 0 permintaan akun.
 - Password DB produksi sempat tertulis di percakapan saat menyusun spec ini.
   Disarankan diganti.
+
+## Perubahan setelah rilis (20 Nov 2026)
+
+- **Jam Mulai Lembur Sabtu = Jam Pulang Sabtu (14:00)**, bukan Jam Pulang +
+  1 jam (15:00) seperti di keputusan 3 dan story 48. Senin–Jumat tetap 18:00.
+  Kode tidak berubah (validasi Waktu Kerja sudah menerima Jam Mulai Lembur =
+  Jam Pulang); nilainya diubah lewat migrasi data
+  `20261120010000_saturday_overtime_at_check_out`, yang hanya menyentuh Sabtu
+  yang masih memakai nilai awal supaya pilihan admin tidak tertimpa.

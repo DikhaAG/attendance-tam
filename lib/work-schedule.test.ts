@@ -26,7 +26,7 @@ const WEEK_WITH_SHORT_SATURDAY: WorkDayConfig[] = [
   { dayOfWeek: 3, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00", overtimeStartTime: "18:00" },
   { dayOfWeek: 4, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00", overtimeStartTime: "18:00" },
   { dayOfWeek: 5, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "17:00", overtimeStartTime: "18:00" },
-  { dayOfWeek: 6, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "14:00", overtimeStartTime: "15:00" },
+  { dayOfWeek: 6, isWorkingDay: true, checkInTime: "08:00", checkOutTime: "14:00", overtimeStartTime: "14:00" },
 ];
 
 const TOLERANCE_MINUTES = 15;
@@ -119,9 +119,9 @@ describe("ringkasan minggu", () => {
 });
 
 describe("Jam Mulai Lembur", () => {
-  it("Sabtu Lembur boleh dimulai pukul 15:00, belum boleh pukul 14:30", () => {
-    expect(canStartOvertimeAt(at("15:00"), dayOf(SATURDAY))).toBe(true);
-    expect(canStartOvertimeAt(at("14:30"), dayOf(SATURDAY))).toBe(false);
+  it("Sabtu Lembur boleh dimulai tepat pukul 14:00 (Jam Pulang), belum boleh pukul 13:59", () => {
+    expect(canStartOvertimeAt(at("14:00"), dayOf(SATURDAY))).toBe(true);
+    expect(canStartOvertimeAt(at("13:59"), dayOf(SATURDAY))).toBe(false);
   });
 
   it("Senin Lembur belum boleh pukul 17:30, boleh mulai 18:00", () => {
